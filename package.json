@@ -1,0 +1,12 @@
+{
+  "name": "slidecast-pipeline",
+  "version": "0.1.0",
+  "description": "CLI to generate MP4 from PDF slides and audio",
+  "bin": {
+    "slidecast": "bin/slidecast.js"
+  },
+  "scripts": {
+    "start": "node bin/slidecast.js"
+  },
+  "license": "MIT"
+}
