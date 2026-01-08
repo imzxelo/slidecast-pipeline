@@ -8,5 +8,8 @@
   "scripts": {
     "start": "node bin/slidecast.js"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "pdfkit": "^0.17.2"
+  }
 }
