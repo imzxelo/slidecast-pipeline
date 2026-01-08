@@ -91,3 +91,35 @@
   2) どう確認するか（コマンド）
   3) PR情報（タイトル/概要）
 - タスク粒度の逐次ログは書かない（必要ならTasks.mdやPRに残す）。
+
+---
+
+## 外部ドキュメント参照（MCP fetch）
+
+このリポジトリでは **MCP fetchツール** が有効。外部ドキュメントをその場で取得・確認できる。
+
+### いつ使うか
+- **ffmpeg/ffprobe のオプション確認**
+  - concat demuxer形式、コーデック指定、フィルター構文など
+- **pdftoppm のオプション確認**
+  - 出力形式、解像度指定、ページ範囲など
+- **その他CLIツールの公式ドキュメント**
+  - 記憶に頼らず、公式を確認してから実装する
+
+### 参照すべき公式URL（優先度順）
+| ツール | URL |
+|--------|-----|
+| ffmpeg concat demuxer | https://ffmpeg.org/ffmpeg-formats.html#concat |
+| ffmpeg codecs | https://ffmpeg.org/ffmpeg-codecs.html |
+| ffprobe | https://ffmpeg.org/ffprobe.html |
+| pdftoppm (poppler) | https://poppler.freedesktop.org/ |
+
+### 使い方の例
+```
+mcp__fetch__fetch(url="https://ffmpeg.org/ffmpeg-formats.html#concat")
+```
+
+### 注意点
+- **推測で書かない** — オプションや形式に迷ったら必ず公式を引く
+- **エラー発生時** — まず公式ドキュメントで正しい構文を確認する
+- **キャッシュなし** — 毎回最新を取得するので、同じURLを何度も叩かない
