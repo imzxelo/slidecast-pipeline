@@ -293,7 +293,7 @@ async function summarizeSlides(pdfPath) {
           ]
         }],
         config: {
-          thinkingConfig: { thinkingBudget: 'minimal' }
+          thinkingConfig: { thinkingBudget: 0 }
         }
       });
 
@@ -344,8 +344,8 @@ async function callOpenAI(prompt) {
   }
 
   const data = await response.json();
-  // Responses API returns output_text directly
-  return data.output_text;
+  // Responses API returns output in nested structure
+  return data.output?.[0]?.content?.[0]?.text || '';
 }
 
 // Generate summary for video description
@@ -501,13 +501,13 @@ app.listen(PORT, () => {
   if (!OPENAI_API_KEY) {
     console.log('Note: OPENAI_API_KEY is not set. AI generation features will not work.');
   } else {
-    console.log('OpenAI GPT-5.2: enabled');
+    console.log('OpenAI GPT-5.2 (Responses API): enabled');
   }
 
   // Gemini status
   if (!GEMINI_API_KEY) {
     console.log('Note: GEMINI_API_KEY is not set. PDF analysis features will not work.');
   } else {
-    console.log('Gemini 3.0 Flash: enabled');
+    console.log('Gemini 3.0 Flash (gemini-3-flash-preview): enabled');
   }
 });

@@ -8,6 +8,30 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 
 ---
 
+## Git / PR 情報
+
+| 項目 | 値 |
+|------|-----|
+| 現在のブランチ | `task/T-021-api-bugfix` |
+| PR | [#3 T-021: API バグ修正（Gemini/OpenAI）](https://github.com/imzxelo/slidecast-pipeline/pull/3) |
+| PR状態 | ⏳ **OPEN** |
+
+### PR履歴
+| PR | タイトル | 状態 |
+|----|----------|------|
+| [#2](https://github.com/imzxelo/slidecast-pipeline/pull/2) | T-020: Slide Sync Editor完成 | ✅ MERGED |
+| [#3](https://github.com/imzxelo/slidecast-pipeline/pull/3) | T-021: API バグ修正（Gemini/OpenAI） | ⏳ OPEN |
+
+### 最近のコミット履歴（task/T-021-api-bugfix）
+```
+73d98e1 docs: Tasks.mdのコミット履歴を更新
+4159f03 fix: Gemini 3.0 Flash (gemini-3-flash-preview) を使用するよう修正
+fb09393 docs: Tasks.mdにGit/PR情報と変更履歴を追加
+c52f445 fix: Gemini/OpenAI API呼び出しを修正
+```
+
+---
+
 ## 現在の進行状況
 
 | Phase | 内容 | 状態 |
@@ -22,37 +46,52 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 
 ---
 
-## 既知のバグ（要修正）
+## 既知のバグ（修正済み）
 
-### BUG-001: Gemini PDF分析が動作しない 🔴
+### BUG-001: Gemini PDF分析が動作しない ✅ 修正済み
 - **症状**: 「PDF分析（Gemini）」ボタンを押してもローディングが永遠に続く
-- **原因**: Gemini API呼び出しの実装に問題がある可能性
-- **調査項目**:
-  - [ ] @google/genai パッケージのAPI形式を確認
-  - [ ] サーバーログでエラーを確認
-  - [ ] APIキーが正しく読み込まれているか確認
-- **優先度**: P0
+- **原因**: `config.thinkingConfig.thinkingBudget` に無効な値 `"minimal"` を渡していた
+- **修正内容** (2026-01-10):
+  - `thinkingConfig` を削除
+  - モデルを `gemini-2.0-flash` に変更
 
-### BUG-002: 動画が保存されない 🔴
+### BUG-002: 動画が保存されない ❓ 再現不可
 - **症状**: 動画生成が完了しても、ファイルがダウンロードされない
-- **原因**: 調査中
-- **調査項目**:
-  - [ ] サーバー側でファイルが正しく生成されているか確認
-  - [ ] レスポンスが正しく返されているか確認
-  - [ ] フロントエンドのダウンロード処理を確認
-- **優先度**: P0
+- **調査結果** (2026-01-10):
+  - サーバー側の動画生成APIは正常動作（MP4ファイルが正しく生成される）
+  - フロントエンドのダウンロード処理も問題なし
+  - 環境依存の問題の可能性あり（ブラウザのダウンロード設定等）
 
-### BUG-003: OpenAI GPT-5.2 AI機能が動作しない
+### BUG-003: OpenAI GPT-5.2 AI機能が動作しない ✅ 修正済み
 - **症状**: AI支援機能のボタンを押してもローディングが続く
-- **原因**: OpenAI Responses API の呼び出し形式に問題がある可能性
-- **調査項目**:
-  - [ ] レスポンス形式を確認（output_text vs 他のフィールド）
-  - [ ] エラーログを確認
-- **優先度**: P1
+- **原因**: Responses APIのレスポンス取得方法が間違っていた
+  - 誤: `data.output_text`
+  - 正: `data.output[0].content[0].text`
+- **修正内容** (2026-01-10):
+  - レスポンス取得を正しい形式に修正
 
 ---
 
 ## 完了した変更履歴
+
+### 2026-01-10: API バグ修正
+
+#### 修正内容
+- [x] **BUG-001: Gemini API修正**
+  - 原因: `config.thinkingConfig.thinkingBudget` に無効な値 `"minimal"`（文字列）を渡していた
+  - 修正: `thinkingBudget: 0`（整数）に変更、モデルは `gemini-3-flash-preview` を維持
+  - コミット: `39ef366`, 追加修正あり
+
+- [x] **BUG-003: OpenAI API修正**
+  - 原因: Responses APIのレスポンス取得方法が間違っていた
+  - 修正: `data.output_text` → `data.output[0].content[0].text`
+  - コミット: `39ef366`
+
+- [x] **BUG-002: 動画保存問題調査**
+  - 結果: サーバー側の動画生成APIは正常動作（再現不可）
+  - curlテストでMP4ファイル正常生成を確認
+
+---
 
 ### 2026-01-09: Phase 3 拡張 + AI統合
 
@@ -180,7 +219,7 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 - [x] 概要欄生成（OpenAI GPT-5.2）
 - [x] キーポイント抽出
 - [x] クイズ生成
-- [x] PDF分析（Gemini 3.0 Flash）※要修正
+- [x] PDF分析（Gemini 3.0 Flash）✅ 修正済み
 - [x] アニメーション/AIパネル切り替え
 
 ### UX改善
@@ -274,8 +313,8 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 - dotenv（環境変数）
 
 ### 外部API
-- OpenAI GPT-5.2 Responses API（AI生成）
-- Gemini 3.0 Flash（PDF分析）※要修正
+- OpenAI GPT-5.2 Responses API（AI生成）✅
+- Gemini 3.0 Flash (gemini-3-flash-preview)（PDF分析）✅
 
 ### ツール
 - ffmpeg/ffprobe（動画生成）

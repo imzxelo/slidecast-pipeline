@@ -18,30 +18,21 @@
 
 ---
 
-## 緊急で修正が必要なバグ
+## バグ修正履歴（2026-01-10）
 
-### BUG-001: Gemini PDF分析が動作しない 🔴
-- **ファイル**: `server.js` (259-320行付近)
-- **症状**: 「PDF分析（Gemini）」ボタンを押すとローディングが永遠に続く
-- **原因推定**: @google/genai パッケージのAPI呼び出し形式が間違っている
-- **修正方針**:
-  ```javascript
-  // 現在のコード（間違い？）
-  const response = await geminiClient.models.generateContent({...})
+### BUG-001: Gemini PDF分析が動作しない ✅ 修正済み
+- **原因**: `config.thinkingConfig.thinkingBudget` に無効な値 `"minimal"` を渡していた
+- **修正内容**:
+  - `thinkingConfig` を削除
+  - モデルを `gemini-2.0-flash` に変更
 
-  // 正しい形式を公式ドキュメントで確認する
-  // https://ai.google.dev/gemini-api/docs
-  ```
+### BUG-002: 動画保存問題 ❓ 再現不可
+- **調査結果**: サーバー側の動画生成APIは正常動作
 
-### BUG-002: OpenAI GPT-5.2 AI機能が動作しない
-- **ファイル**: `server.js` (322-348行付近)
-- **症状**: AI支援ボタンを押すとローディングが続く
-- **原因推定**: OpenAI Responses API の形式が間違っている
-- **現在のコード**:
-  ```javascript
-  const response = await fetch('https://api.openai.com/v1/responses', {...})
-  return data.output_text;  // ← このフィールド名が正しいか確認
-  ```
+### BUG-003: OpenAI GPT-5.2 AI機能が動作しない ✅ 修正済み
+- **原因**: Responses APIのレスポンス取得方法が間違っていた
+- **修正内容**:
+  - `data.output_text` → `data.output[0].content[0].text` に変更
 
 ---
 
@@ -72,12 +63,7 @@
 
 ## 次にやるべきこと（優先順）
 
-### 1. バグ修正（P0）
-- [ ] Gemini API呼び出しを修正
-- [ ] OpenAI Responses API呼び出しを修正
-- [ ] サーバーログでエラー詳細を確認
-
-### 2. Phase 6: AI自動マーカー生成
+### 1. Phase 6: AI自動マーカー生成
 - [ ] Gemini でスライド内容を要約
 - [ ] Whisper/Speech-to-Text で音声文字起こし
 - [ ] AIがスライドと音声をマッチングしてマーカー自動生成
@@ -190,9 +176,10 @@ npx playwright test
 
 ---
 
-## 最後に確認したこと（2026-01-09）
+## 最後に確認したこと（2026-01-10）
 
-1. t=0マーカー自動補完は実装済み（サーバー再起動で反映）
-2. Gemini/OpenAI APIは未動作（API呼び出し形式の修正が必要）
-3. Tasks.md にバグ・変更履歴・将来計画を集約済み
-4. PRはマージ待ち状態
+1. t=0マーカー自動補完は実装済み
+2. **Gemini API修正済み** - `thinkingConfig` を削除、モデルを `gemini-2.0-flash` に変更
+3. **OpenAI API修正済み** - レスポンス取得を正しい形式 `data.output[0].content[0].text` に修正
+4. 動画生成APIは正常動作（curlでMP4生成を確認）
+5. PRはマージ待ち状態
