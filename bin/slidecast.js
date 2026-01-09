@@ -7,13 +7,14 @@ const { spawnSync } = require('child_process');
 const usage = `slidecast - PDF + audio to MP4
 
 Usage:
-  slidecast --pdf <path> --audio <path> --out <path>
+  slidecast --pdf <path> --audio <path> --out <path> [--timings <path> | --markers <path>]
 
 Options:
   --pdf <path>       Input PDF file
   --audio <path>     Input audio file (m4a, mp3, etc.)
   --out <path>       Output MP4 file
   --timings <path>   Optional timings CSV (index,seconds)
+  --markers <path>   Optional markers JSON ({ markers: [{ t, slide }, ...] })
   --workdir <path>   Optional working directory
   --keep-work        Keep working files
   --dry-run          Print planned steps and exit
@@ -26,6 +27,7 @@ function parseArgs(argv) {
     audio: null,
     out: null,
     timings: null,
+    markers: null,
     workdir: null,
     keepWork: false,
     dryRun: false,
@@ -45,7 +47,7 @@ function parseArgs(argv) {
       args.dryRun = true;
       continue;
     }
-    if (arg === '--pdf' || arg === '--audio' || arg === '--out' || arg === '--timings' || arg === '--workdir') {
+    if (arg === '--pdf' || arg === '--audio' || arg === '--out' || arg === '--timings' || arg === '--markers' || arg === '--workdir') {
       const value = argv[i + 1];
       if (!value || value.startsWith('--')) {
         throw new Error(`Missing value for ${arg}`);
@@ -54,6 +56,7 @@ function parseArgs(argv) {
       if (arg === '--audio') args.audio = value;
       if (arg === '--out') args.out = value;
       if (arg === '--timings') args.timings = value;
+      if (arg === '--markers') args.markers = value;
       if (arg === '--workdir') args.workdir = value;
       i += 1;
       continue;
@@ -146,6 +149,9 @@ function listSlideImages(workdir) {
 }
 
 function computeEqualDurations(totalSeconds, count) {
+  if (count <= 0) {
+    throw new Error('No slides available to compute durations');
+  }
   const base = totalSeconds / count;
   const durations = Array(count).fill(base);
   const sumFirst = base * (count - 1);
@@ -155,6 +161,141 @@ function computeEqualDurations(totalSeconds, count) {
   }
   durations[count - 1] = last;
   return durations;
+}
+
+function parseTimingsCsv(timingsPath, slideCount, totalSeconds) {
+  const content = fs.readFileSync(timingsPath, 'utf8');
+  const durations = Array(slideCount).fill(null);
+  const lines = content.split(/\r?\n/);
+  let specifiedTotal = 0;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const raw = lines[i].trim();
+    if (!raw || raw.startsWith('#')) continue;
+    const parts = raw.split(',').map((part) => part.trim());
+    if (parts.length < 2) {
+      throw new Error(`Invalid timings CSV at line ${i + 1}: "${raw}"`);
+    }
+    const index = Number(parts[0]);
+    const seconds = Number(parts[1]);
+    if (!Number.isFinite(index) || !Number.isFinite(seconds)) {
+      if (i === 0 && /index|slide|page/i.test(raw)) continue;
+      throw new Error(`Invalid timings CSV at line ${i + 1}: "${raw}"`);
+    }
+    if (!Number.isInteger(index) || index < 1 || index > slideCount) {
+      throw new Error(`Timing index out of range at line ${i + 1}: ${parts[0]}`);
+    }
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      throw new Error(`Timing seconds must be > 0 at line ${i + 1}: ${parts[1]}`);
+    }
+    if (durations[index - 1] !== null) {
+      throw new Error(`Duplicate timing for slide ${index}`);
+    }
+    durations[index - 1] = seconds;
+    specifiedTotal += seconds;
+  }
+
+  if (specifiedTotal > totalSeconds) {
+    throw new Error(`timings.csv total (${specifiedTotal.toFixed(3)}s) exceeds audio duration (${totalSeconds.toFixed(3)}s)`);
+  }
+
+  const remaining = totalSeconds - specifiedTotal;
+  const unsetIndices = durations.map((value, idx) => (value === null ? idx : null)).filter((value) => value !== null);
+
+  if (unsetIndices.length > 0) {
+    const perSlide = remaining / unsetIndices.length;
+    if (perSlide <= 0) {
+      throw new Error(`Remaining duration (${remaining.toFixed(3)}s) is not enough for ${unsetIndices.length} slides`);
+    }
+    unsetIndices.forEach((idx) => {
+      durations[idx] = perSlide;
+    });
+  } else if (remaining > 0) {
+    durations[slideCount - 1] += remaining;
+  }
+
+  durations.forEach((seconds, idx) => {
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      throw new Error(`Computed non-positive duration for slide ${idx + 1}: ${seconds}`);
+    }
+  });
+
+  return durations;
+}
+
+function buildSlideIndexMap(slides) {
+  const map = new Map();
+  slides.forEach((file) => {
+    const match = file.match(/^slide-(\d+)\.png$/);
+    if (match) {
+      map.set(Number(match[1]), file);
+    }
+  });
+  return map;
+}
+
+function parseMarkersJson(markersPath) {
+  let data;
+  try {
+    const raw = fs.readFileSync(markersPath, 'utf8');
+    data = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`Failed to parse markers JSON: ${err.message}`);
+  }
+  if (!data || !Array.isArray(data.markers)) {
+    throw new Error('markers.json must include a "markers" array');
+  }
+  return data.markers;
+}
+
+function computeMarkerPlan(markersPath, slideMap, totalSeconds) {
+  const markers = parseMarkersJson(markersPath).map((marker, idx) => {
+    const t = Number(marker.t);
+    const slide = Number(marker.slide);
+    if (!Number.isFinite(t) || t < 0) {
+      throw new Error(`Marker ${idx + 1} has invalid t: ${marker.t}`);
+    }
+    if (!Number.isInteger(slide) || slide < 1) {
+      throw new Error(`Marker ${idx + 1} has invalid slide: ${marker.slide}`);
+    }
+    return { t, slide, order: idx + 1 };
+  });
+
+  if (markers.length === 0) {
+    throw new Error('markers.json must contain at least one marker');
+  }
+
+  markers.sort((a, b) => (a.t - b.t) || (a.order - b.order));
+
+  const firstTolerance = 0.001;
+  if (markers[0].t > firstTolerance) {
+    throw new Error(`First marker must start at t=0 (got ${markers[0].t.toFixed(3)})`);
+  }
+  if (markers[0].t >= 0 && markers[0].t <= firstTolerance) {
+    markers[0].t = 0;
+  }
+
+  const sequence = markers.map((marker) => {
+    const file = slideMap.get(marker.slide);
+    if (!file) {
+      throw new Error(`Marker slide ${marker.slide} has no corresponding PNG`);
+    }
+    return file;
+  });
+
+  const durations = [];
+  for (let i = 0; i < markers.length; i += 1) {
+    const current = markers[i];
+    const nextTime = i < markers.length - 1 ? markers[i + 1].t : totalSeconds;
+    const duration = nextTime - current.t;
+    if (duration <= 0) {
+      const nextLabel = i < markers.length - 1 ? markers[i + 1].t.toFixed(3) : totalSeconds.toFixed(3);
+      throw new Error(`Non-positive duration at marker ${i + 1} (t=${current.t.toFixed(3)} -> ${nextLabel})`);
+    }
+    durations.push(duration);
+  }
+
+  return { sequence, durations };
 }
 
 function escapePath(filePath) {
@@ -236,8 +377,8 @@ function main() {
     fatal(`Missing dependencies: ${missing.join(', ')}. Install with: brew install ffmpeg poppler`);
   }
 
-  if (args.timings) {
-    fatal('timings.csv is not supported yet (Phase 2)');
+  if (args.timings && args.markers) {
+    fatal('Use either --timings or --markers (not both)');
   }
 
   const workdir = getWorkdir(args.workdir);
@@ -249,17 +390,38 @@ function main() {
     const durationSeconds = getAudioDurationSeconds(args.audio);
 
     if (args.dryRun) {
+      const mode = args.markers ? 'markers' : args.timings ? 'timings' : 'equal';
       process.stdout.write(`Dry run:\n`);
       process.stdout.write(`- Workdir: ${workdir}\n`);
       process.stdout.write(`- Audio duration: ${durationSeconds.toFixed(3)} sec\n`);
+      process.stdout.write(`- Sync mode: ${mode}\n`);
+      if (args.markers) {
+        process.stdout.write(`- Markers: ${args.markers}\n`);
+      }
+      if (args.timings) {
+        process.stdout.write(`- Timings: ${args.timings}\n`);
+      }
       process.stdout.write(`- Planned steps: pdftoppm -> concat -> ffmpeg (video) -> ffmpeg (merge audio)\n`);
       return;
     }
 
     convertPdfToPng(args.pdf, workdir);
     const slides = listSlideImages(workdir);
-    const durations = computeEqualDurations(durationSeconds, slides.length);
-    const concatPath = writeConcatFile(workdir, slides, durations);
+    const slideMap = buildSlideIndexMap(slides);
+    let sequence = slides;
+    let durations = null;
+
+    if (args.markers) {
+      const markerPlan = computeMarkerPlan(args.markers, slideMap, durationSeconds);
+      sequence = markerPlan.sequence;
+      durations = markerPlan.durations;
+    } else if (args.timings) {
+      durations = parseTimingsCsv(args.timings, slides.length, durationSeconds);
+    } else {
+      durations = computeEqualDurations(durationSeconds, slides.length);
+    }
+
+    const concatPath = writeConcatFile(workdir, sequence, durations);
     const videoPath = buildVideo(concatPath, workdir);
 
     ensureOutDir(args.out);
