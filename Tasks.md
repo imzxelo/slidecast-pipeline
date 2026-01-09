@@ -13,8 +13,8 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 | 項目 | 値 |
 |------|-----|
 | 現在のブランチ | `task/T-023-ai-auto-markers` |
-| PR | 作成予定 |
-| PR状態 | ⏳ **開発中** |
+| PR | [#5 T-023: AI自動マーカー生成機能](https://github.com/imzxelo/slidecast-pipeline/pull/5) |
+| PR状態 | ⏳ **OPEN** |
 
 ### PR履歴
 | PR | タイトル | 状態 |
@@ -22,10 +22,11 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 | [#2](https://github.com/imzxelo/slidecast-pipeline/pull/2) | T-020: Slide Sync Editor完成 | ✅ MERGED |
 | [#3](https://github.com/imzxelo/slidecast-pipeline/pull/3) | T-021: API バグ修正（Gemini/OpenAI） | ✅ MERGED |
 | [#4](https://github.com/imzxelo/slidecast-pipeline/pull/4) | T-022: CLI 使い勝手向上 - 進捗表示追加 | ✅ MERGED |
+| [#5](https://github.com/imzxelo/slidecast-pipeline/pull/5) | T-023: AI自動マーカー生成機能 (Phase 6) | ⏳ OPEN |
 
 ### 最近のコミット履歴（task/T-023-ai-auto-markers）
 ```
-（開発中）
+0bc9196 feat: AI自動マーカー生成機能を追加 (Phase 6)
 ```
 
 ---
