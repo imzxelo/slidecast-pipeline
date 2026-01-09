@@ -310,11 +310,11 @@
     .marker-item {
       background: #f8f6f3;
       border-radius: 6px;
-      padding: 14px 16px;
+      padding: 10px 12px;
       margin-bottom: 10px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       border: 1px solid #e8e4df;
       transition: all 0.2s;
     }
@@ -326,18 +326,31 @@
       border-left: 4px solid #c9a227;
       background: #fffdf8;
     }
+    .marker-thumb {
+      width: 50px;
+      height: 38px;
+      object-fit: cover;
+      border-radius: 4px;
+      border: 1px solid #d0ccc5;
+      flex-shrink: 0;
+    }
+    .marker-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
     .marker-time {
       font-family: 'SF Mono', Monaco, monospace;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       color: #1e3a5f;
-      min-width: 80px;
     }
     .marker-slide {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 500;
-      color: #4a4a4a;
-      flex: 1;
+      color: #888;
     }
     .marker-actions {
       display: flex;
@@ -905,6 +918,7 @@
     let totalPages = 0;
     let markers = [];
     let editingMarkerIndex = -1;
+    let slideThumbnails = {}; // Cache for slide thumbnail data URLs
 
     // DOM Elements
     const pdfInput = document.getElementById('pdfInput');
@@ -959,6 +973,8 @@
     // Render thumbnails
     async function renderThumbnails() {
       thumbnails.innerHTML = '';
+      slideThumbnails = {}; // Clear cache
+
       for (let i = 1; i <= totalPages; i++) {
         const page = await pdfDoc.getPage(i);
         const viewport = page.getViewport({ scale: 0.3 });
@@ -973,6 +989,9 @@
 
         const ctx = canvas.getContext('2d');
         await page.render({ canvasContext: ctx, viewport }).promise;
+
+        // Cache thumbnail as data URL for marker list
+        slideThumbnails[i] = canvas.toDataURL('image/png');
 
         const label = document.createElement('div');
         label.className = 'thumbnail-label';
@@ -1084,6 +1103,13 @@
       markers.sort((a, b) => a.t - b.t);
       renderMarkers();
       renderMarkerIndicators();
+
+      // 自動的に次のスライドに進む
+      if (currentPage < totalPages) {
+        currentPage++;
+        renderPage(currentPage);
+        updateThumbnailSelection();
+      }
     }
 
     addMarkerBtn.addEventListener('click', addMarker);
@@ -1097,8 +1123,11 @@
 
       markersList.innerHTML = markers.map((m, i) => `
         <div class="marker-item" data-index="${i}">
-          <span class="marker-time">${formatTime(m.t)}</span>
-          <span class="marker-slide">スライド ${m.slide}</span>
+          <img class="marker-thumb" src="${slideThumbnails[m.slide] || ''}" alt="スライド ${m.slide}">
+          <div class="marker-info">
+            <span class="marker-time">${formatTime(m.t)}</span>
+            <span class="marker-slide">スライド ${m.slide}</span>
+          </div>
           <div class="marker-actions">
             <button class="edit" title="編集" onclick="openEditModal(${i})">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
