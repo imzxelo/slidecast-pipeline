@@ -72,6 +72,10 @@ function fatal(message) {
   process.exit(1);
 }
 
+function progress(step, message) {
+  process.stdout.write(`[${step}] ${message}\n`);
+}
+
 function commandExists(cmd) {
   const result = spawnSync('which', [cmd], { stdio: 'ignore' });
   return result.status === 0;
@@ -387,11 +391,12 @@ function main() {
   let error = null;
 
   try {
+    progress('1/5', '音声ファイルを解析中...');
     const durationSeconds = getAudioDurationSeconds(args.audio);
 
     if (args.dryRun) {
       const mode = args.markers ? 'markers' : args.timings ? 'timings' : 'equal';
-      process.stdout.write(`Dry run:\n`);
+      process.stdout.write(`\nDry run:\n`);
       process.stdout.write(`- Workdir: ${workdir}\n`);
       process.stdout.write(`- Audio duration: ${durationSeconds.toFixed(3)} sec\n`);
       process.stdout.write(`- Sync mode: ${mode}\n`);
@@ -405,27 +410,38 @@ function main() {
       return;
     }
 
+    progress('2/5', 'PDFを画像に変換中...');
     convertPdfToPng(args.pdf, workdir);
     const slides = listSlideImages(workdir);
     const slideMap = buildSlideIndexMap(slides);
+    progress('2/5', `${slides.length}枚のスライドを検出`);
+
     let sequence = slides;
     let durations = null;
 
+    progress('3/5', 'タイミングを計算中...');
     if (args.markers) {
       const markerPlan = computeMarkerPlan(args.markers, slideMap, durationSeconds);
       sequence = markerPlan.sequence;
       durations = markerPlan.durations;
+      progress('3/5', `${durations.length}個のマーカーを適用`);
     } else if (args.timings) {
       durations = parseTimingsCsv(args.timings, slides.length, durationSeconds);
+      progress('3/5', 'timings.csvを適用');
     } else {
       durations = computeEqualDurations(durationSeconds, slides.length);
+      progress('3/5', '等間隔モードを適用');
     }
 
+    progress('4/5', '動画を生成中...');
     const concatPath = writeConcatFile(workdir, sequence, durations);
     const videoPath = buildVideo(concatPath, workdir);
 
+    progress('5/5', '音声を合成中...');
     ensureOutDir(args.out);
     mergeAudio(videoPath, args.audio, args.out);
+
+    progress('完了', `出力: ${args.out}`);
   } catch (err) {
     error = err;
     process.stderr.write(`Error: ${err.message}\n`);
