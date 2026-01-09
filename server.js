@@ -5,12 +5,20 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { spawnSync } = require('child_process');
+const { GoogleGenAI } = require('@google/genai');
 
 const app = express();
 const PORT = 3001;
 
-// OpenAI API Key (set via .env file or environment variable)
+// API Keys (set via .env file or environment variable)
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+
+// Gemini client
+let geminiClient = null;
+if (GEMINI_API_KEY) {
+  geminiClient = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+}
 
 // Upload configuration
 const upload = multer({ dest: 'uploads/' });
@@ -94,11 +102,12 @@ function computeMarkerPlan(markers, slideMap, totalSeconds) {
     throw new Error('No markers provided');
   }
 
-  // Allow first marker to be slightly after 0
+  // 最初のマーカーがt=0でない場合、スライド1をt=0に自動追加
   if (sorted[0].t > 0.001) {
-    throw new Error(`First marker must start at t=0 (got ${sorted[0].t.toFixed(3)})`);
+    sorted.unshift({ t: 0, slide: 1, order: 0 });
+  } else {
+    sorted[0].t = 0;
   }
-  sorted[0].t = 0;
 
   const sequence = sorted.map((marker) => {
     const file = slideMap.get(marker.slide);
@@ -244,6 +253,72 @@ app.post('/api/generate', upload.fields([
   }
 });
 
+// PDF slide summaries cache (per session)
+let slideSummariesCache = null;
+
+// Gemini 3.0 Flash でスライドを要約
+async function summarizeSlides(pdfPath) {
+  if (!geminiClient) {
+    throw new Error('GEMINI_API_KEY is not set');
+  }
+
+  // PDFをPNG変換（一時ディレクトリ）
+  const workdir = path.join('work', `summary-${Date.now()}`);
+  fs.mkdirSync(workdir, { recursive: true });
+
+  try {
+    convertPdfToPng(pdfPath, workdir);
+    const slides = listSlideImages(workdir);
+
+    const summaries = [];
+
+    for (let i = 0; i < slides.length; i++) {
+      const slidePath = path.join(workdir, slides[i]);
+      const imageData = fs.readFileSync(slidePath);
+      const base64Image = imageData.toString('base64');
+
+      const response = await geminiClient.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: [{
+          parts: [
+            {
+              inlineData: {
+                mimeType: 'image/png',
+                data: base64Image
+              }
+            },
+            {
+              text: 'このスライドの内容を日本語で簡潔に要約してください。箇条書きで主要なポイントを3つ以内で挙げてください。'
+            }
+          ]
+        }],
+        config: {
+          thinkingConfig: { thinkingBudget: 'minimal' }
+        }
+      });
+
+      summaries.push({
+        slide: i + 1,
+        summary: response.text || ''
+      });
+    }
+
+    return summaries;
+  } finally {
+    // 一時ディレクトリを削除
+    fs.rmSync(workdir, { recursive: true, force: true });
+  }
+}
+
+// スライド要約を取得（キャッシュあり）
+async function getSlideSummaries(pdfPath) {
+  if (slideSummariesCache) {
+    return slideSummariesCache;
+  }
+  slideSummariesCache = await summarizeSlides(pdfPath);
+  return slideSummariesCache;
+}
+
 // AI API endpoints (using OpenAI GPT-5.2 Responses API with reasoning)
 async function callOpenAI(prompt) {
   if (!OPENAI_API_KEY) {
@@ -278,13 +353,20 @@ app.post('/api/ai/summary', async (req, res) => {
   try {
     const { pdfName, audioName, slideCount, duration } = req.body;
 
+    // スライド要約がキャッシュされていれば使用
+    let slideContent = '';
+    if (slideSummariesCache && slideSummariesCache.length > 0) {
+      slideContent = '\n\n【スライド内容】\n' +
+        slideSummariesCache.map(s => `スライド${s.slide}: ${s.summary}`).join('\n');
+    }
+
     const prompt = `あなたはYouTube動画の説明文を作成するアシスタントです。
 以下の情報をもとに、eラーニング教材の動画説明文を日本語で作成してください。
 
 PDF名: ${pdfName}
 音声ファイル名: ${audioName}
 スライド枚数: ${slideCount}枚
-動画の長さ: 約${Math.round(duration / 60)}分
+動画の長さ: 約${Math.round(duration / 60)}分${slideContent}
 
 説明文は以下の構成で作成してください：
 - 概要（2-3文）
@@ -306,20 +388,27 @@ app.post('/api/ai/keypoints', async (req, res) => {
   try {
     const { pdfName, slideCount, markers, duration } = req.body;
 
+    // スライド要約がキャッシュされていれば使用
+    let slideContent = '';
+    if (slideSummariesCache && slideSummariesCache.length > 0) {
+      slideContent = '\n\n【スライド内容】\n' +
+        slideSummariesCache.map(s => `スライド${s.slide}: ${s.summary}`).join('\n');
+    }
+
     const prompt = `あなたはプレゼンテーション分析のエキスパートです。
 以下の情報をもとに、この教材のキーポイントを抽出してください。
 
 PDF名: ${pdfName}
 スライド枚数: ${slideCount}枚
 マーカー数: ${markers.length}個
-動画の長さ: 約${Math.round(duration / 60)}分
+動画の長さ: 約${Math.round(duration / 60)}分${slideContent}
 
 以下の形式でキーポイントを5つ程度抽出してください：
 1. [キーポイント1]
 2. [キーポイント2]
 ...
 
-ファイル名や構成から推測される重要なポイントを挙げてください。`;
+スライドの内容に基づいて重要なポイントを挙げてください。`;
 
     const content = await callOpenAI(prompt);
     res.json({ title: 'キーポイント', content });
@@ -334,11 +423,18 @@ app.post('/api/ai/quiz', async (req, res) => {
   try {
     const { pdfName, slideCount } = req.body;
 
+    // スライド要約がキャッシュされていれば使用
+    let slideContent = '';
+    if (slideSummariesCache && slideSummariesCache.length > 0) {
+      slideContent = '\n\n【スライド内容】\n' +
+        slideSummariesCache.map(s => `スライド${s.slide}: ${s.summary}`).join('\n');
+    }
+
     const prompt = `あなたは教育コンテンツの専門家です。
 以下の情報をもとに、理解度確認クイズを作成してください。
 
 PDF名: ${pdfName}
-スライド枚数: ${slideCount}枚
+スライド枚数: ${slideCount}枚${slideContent}
 
 以下の形式で3問のクイズを作成してください：
 
@@ -349,7 +445,7 @@ B: [選択肢B]
 C: [選択肢C]
 正解: [正解の選択肢]
 
-テーマに関連した一般的な知識を問う問題を作成してください。`;
+スライドの内容に基づいた問題を作成してください。`;
 
     const content = await callOpenAI(prompt);
     res.json({ title: '理解度クイズ', content });
@@ -359,12 +455,59 @@ C: [選択肢C]
   }
 });
 
+// PDF分析エンドポイント（Gemini 3.0 Flash でスライドを要約）
+app.post('/api/ai/analyze', upload.single('pdf'), async (req, res) => {
+  try {
+    const pdfFile = req.file;
+    if (!pdfFile) {
+      return res.status(400).json({ error: 'PDF file is required' });
+    }
+
+    if (!geminiClient) {
+      fs.unlinkSync(pdfFile.path);
+      return res.status(400).json({ error: 'GEMINI_API_KEY is not set' });
+    }
+
+    const summaries = await summarizeSlides(pdfFile.path);
+    slideSummariesCache = summaries;
+
+    // Cleanup
+    fs.unlinkSync(pdfFile.path);
+
+    res.json({
+      success: true,
+      slideCount: summaries.length,
+      summaries: summaries
+    });
+  } catch (error) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    console.error('AI Analyze error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// キャッシュされた要約を取得
+app.get('/api/ai/summaries', (req, res) => {
+  if (!slideSummariesCache) {
+    return res.status(404).json({ error: 'No summaries available. Analyze PDF first.' });
+  }
+  res.json({ summaries: slideSummariesCache });
+});
+
 app.listen(PORT, () => {
   console.log(`Slide Sync Editor running at http://localhost:${PORT}`);
+
+  // OpenAI status
   if (!OPENAI_API_KEY) {
-    console.log('Note: OPENAI_API_KEY is not set. AI features will not work.');
-    console.log('Add your API key to .env file: OPENAI_API_KEY=sk-xxx');
+    console.log('Note: OPENAI_API_KEY is not set. AI generation features will not work.');
   } else {
-    console.log('AI features enabled (GPT-5.2)');
+    console.log('OpenAI GPT-5.2: enabled');
+  }
+
+  // Gemini status
+  if (!GEMINI_API_KEY) {
+    console.log('Note: GEMINI_API_KEY is not set. PDF analysis features will not work.');
+  } else {
+    console.log('Gemini 3.0 Flash: enabled');
   }
 });

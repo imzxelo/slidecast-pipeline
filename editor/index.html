@@ -693,6 +693,15 @@
     .ai-panel.active {
       display: flex;
     }
+    .ai-status {
+      font-size: 13px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    .ai-status.analyzed {
+      color: #4ade80;
+    }
     .ai-buttons {
       display: flex;
       flex-wrap: wrap;
@@ -718,6 +727,17 @@
     .ai-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+    .ai-btn.ai-analyze {
+      background: rgba(74, 222, 128, 0.2);
+      border-color: #4ade80;
+    }
+    .ai-btn.ai-analyze:hover {
+      background: rgba(74, 222, 128, 0.3);
+    }
+    .ai-btn.ai-analyze.done {
+      background: rgba(74, 222, 128, 0.4);
+      color: #4ade80;
     }
     .ai-btn.loading {
       position: relative;
@@ -889,7 +909,9 @@
 
     <div class="ai-panel" id="aiPanel">
       <div class="loading-title">待ち時間を有効活用</div>
+      <div class="ai-status" id="aiStatus">PDFを分析すると、より正確な結果が得られます</div>
       <div class="ai-buttons">
+        <button class="ai-btn ai-analyze" id="aiAnalyzeBtn">PDF分析（Gemini）</button>
         <button class="ai-btn" id="aiSummaryBtn">概要欄を生成</button>
         <button class="ai-btn" id="aiKeyPointsBtn">キーポイント抽出</button>
         <button class="ai-btn" id="aiQuizBtn">クイズを生成</button>
@@ -1333,11 +1355,14 @@
     const boxesContainer = document.getElementById('boxes');
 
     // AI elements
+    const aiAnalyzeBtn = document.getElementById('aiAnalyzeBtn');
     const aiSummaryBtn = document.getElementById('aiSummaryBtn');
     const aiKeyPointsBtn = document.getElementById('aiKeyPointsBtn');
     const aiQuizBtn = document.getElementById('aiQuizBtn');
     const aiResult = document.getElementById('aiResult');
     const aiCopyBtn = document.getElementById('aiCopyBtn');
+    const aiStatus = document.getElementById('aiStatus');
+    let pdfAnalyzed = false;
 
     // Loading state
     let boxCount = 0;
@@ -1473,6 +1498,57 @@
       }
     }
 
+    // PDF分析（Gemini）
+    aiAnalyzeBtn.addEventListener('click', async () => {
+      if (!pdfFile) {
+        aiResult.innerHTML = '<p>PDFファイルを先に読み込んでください</p>';
+        return;
+      }
+
+      aiAnalyzeBtn.disabled = true;
+      aiAnalyzeBtn.classList.add('loading');
+      aiResult.innerHTML = '<p>PDFを分析中... (各スライドを読み取っています)</p>';
+      aiCopyBtn.style.display = 'none';
+
+      try {
+        const formData = new FormData();
+        formData.append('pdf', pdfFile);
+
+        const response = await fetch('/api/ai/analyze', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'PDF分析に失敗しました');
+        }
+
+        const data = await response.json();
+        pdfAnalyzed = true;
+        aiAnalyzeBtn.classList.add('done');
+        aiAnalyzeBtn.textContent = '分析完了 ✓';
+        aiStatus.textContent = `${data.slideCount}枚のスライドを分析しました`;
+        aiStatus.classList.add('analyzed');
+
+        // 結果を表示
+        const summaryText = data.summaries.map(s =>
+          `【スライド${s.slide}】\n${s.summary}`
+        ).join('\n\n');
+        aiResult.innerHTML = `<h4>スライド要約</h4><p>${summaryText.replace(/\n/g, '<br>')}</p>`;
+        aiCopyBtn.style.display = 'block';
+      } catch (error) {
+        if (error.message.includes('GEMINI')) {
+          aiResult.innerHTML = '<p>GEMINI_API_KEYが設定されていません。<br>.envファイルにGEMINI_API_KEYを設定してください。</p>';
+        } else {
+          aiResult.innerHTML = `<p>エラー: ${error.message}</p>`;
+        }
+      } finally {
+        aiAnalyzeBtn.disabled = false;
+        aiAnalyzeBtn.classList.remove('loading');
+      }
+    });
+
     aiSummaryBtn.addEventListener('click', () => callAI('summary'));
     aiKeyPointsBtn.addEventListener('click', () => callAI('keypoints'));
     aiQuizBtn.addEventListener('click', () => callAI('quiz'));
@@ -1496,7 +1572,8 @@
         return;
       }
 
-      // Show loading modal
+      // 音声を停止してからローディング表示
+      audioPlayer.pause();
       showLoadingModal();
       generateBtn.disabled = true;
 
