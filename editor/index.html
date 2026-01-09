@@ -1,0 +1,1622 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slide Sync Editor</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f5f3f0;
+      color: #2c2c2c;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      box-shadow: 0 4px 12px rgba(30, 58, 95, 0.3);
+    }
+    header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 1px;
+    }
+    header h1::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 22px;
+      background: #c9a227;
+      margin-right: 12px;
+      vertical-align: middle;
+    }
+    .file-inputs {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      margin-left: auto;
+    }
+    .file-inputs label {
+      background: rgba(255,255,255,0.15);
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.3);
+      transition: all 0.2s;
+    }
+    .file-inputs label:hover {
+      background: rgba(255,255,255,0.25);
+      border-color: #c9a227;
+    }
+    .file-inputs input[type="file"] {
+      display: none;
+    }
+    .file-name {
+      font-size: 13px;
+      color: rgba(255,255,255,0.7);
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .main-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    .left-panel {
+      width: 200px;
+      background: #fff;
+      border-right: 1px solid #e0dcd5;
+      overflow-y: auto;
+      padding: 16px;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1e3a5f;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #c9a227;
+    }
+    .thumbnail {
+      background: #fff;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      overflow: hidden;
+      border: 2px solid #e0dcd5;
+      transition: all 0.2s;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+    .thumbnail:hover {
+      border-color: #1e3a5f;
+    }
+    .thumbnail.active {
+      border-color: #c9a227;
+      box-shadow: 0 4px 12px rgba(201, 162, 39, 0.3);
+    }
+    .thumbnail canvas {
+      width: 100%;
+      display: block;
+    }
+    .thumbnail-label {
+      text-align: center;
+      padding: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #4a4a4a;
+      background: #f8f6f3;
+    }
+    .center-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #eae6e1;
+    }
+    .slide-view {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow: hidden;
+    }
+    .slide-view canvas {
+      max-width: 100%;
+      max-height: 100%;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+      border: 1px solid #d0ccc5;
+    }
+    .audio-controls {
+      background: #fff;
+      padding: 20px 28px;
+      border-top: 1px solid #e0dcd5;
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+    }
+    .time-display {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      font-weight: 500;
+      color: #1e3a5f;
+      margin-bottom: 10px;
+      font-family: 'SF Mono', Monaco, monospace;
+    }
+    .progress-container {
+      position: relative;
+      height: 12px;
+      background: #e8e4df;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 16px;
+      border: 1px solid #d0ccc5;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #1e3a5f, #2d5a8f);
+      border-radius: 6px;
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+    .marker-indicator {
+      position: absolute;
+      top: -2px;
+      width: 4px;
+      height: 16px;
+      background: #c9a227;
+      border-radius: 2px;
+      transform: translateX(-50%);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .playback-controls {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .play-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(30, 58, 95, 0.4);
+    }
+    .play-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 16px rgba(30, 58, 95, 0.5);
+    }
+    .play-btn:active {
+      transform: scale(0.98);
+    }
+    .play-btn svg {
+      fill: white;
+      width: 22px;
+      height: 22px;
+    }
+    .speed-control {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #4a4a4a;
+    }
+    .speed-control select {
+      background: #f8f6f3;
+      color: #2c2c2c;
+      border: 1px solid #d0ccc5;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .speed-control select:focus {
+      outline: none;
+      border-color: #1e3a5f;
+    }
+    .right-panel {
+      width: 340px;
+      background: #fff;
+      border-left: 1px solid #e0dcd5;
+      display: flex;
+      flex-direction: column;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.05);
+    }
+    .panel-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #e0dcd5;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f8f6f3;
+    }
+    .panel-header h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1e3a5f;
+      letter-spacing: 0.5px;
+    }
+    .panel-header h2::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 15px;
+      background: #c9a227;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+    .panel-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .panel-actions button {
+      background: #fff;
+      border: 1px solid #d0ccc5;
+      color: #4a4a4a;
+      padding: 8px 14px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .panel-actions button:hover {
+      border-color: #1e3a5f;
+      color: #1e3a5f;
+    }
+    .panel-actions button.primary {
+      background: #1e3a5f;
+      border-color: #1e3a5f;
+      color: #fff;
+    }
+    .panel-actions button.primary:hover {
+      background: #2d4a6f;
+    }
+    .markers-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+    .marker-item {
+      background: #f8f6f3;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid #e8e4df;
+      transition: all 0.2s;
+    }
+    .marker-item:hover {
+      border-color: #d0ccc5;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .marker-item.current {
+      border-left: 4px solid #c9a227;
+      background: #fffdf8;
+    }
+    .marker-thumb {
+      width: 50px;
+      height: 38px;
+      object-fit: cover;
+      border-radius: 4px;
+      border: 1px solid #d0ccc5;
+      flex-shrink: 0;
+    }
+    .marker-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+    .marker-time {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: #1e3a5f;
+    }
+    .marker-slide {
+      font-size: 12px;
+      font-weight: 500;
+      color: #888;
+    }
+    .marker-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .marker-actions button {
+      background: transparent;
+      border: 1px solid transparent;
+      color: #888;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .marker-actions button:hover {
+      color: #1e3a5f;
+      background: #f0ece7;
+      border-color: #e0dcd5;
+    }
+    .marker-actions button.delete:hover {
+      color: #c0392b;
+      background: #fdf2f2;
+      border-color: #f5c6cb;
+    }
+    .add-marker-btn {
+      margin: 16px 16px 8px 16px;
+      padding: 14px;
+      background: linear-gradient(135deg, #c9a227 0%, #d4b03a 100%);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(201, 162, 39, 0.3);
+      letter-spacing: 0.5px;
+    }
+    .add-marker-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(201, 162, 39, 0.4);
+    }
+    .generate-btn {
+      margin: 8px 16px 16px 16px;
+      padding: 16px;
+      background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(30, 58, 95, 0.4);
+      letter-spacing: 1px;
+    }
+    .generate-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(30, 58, 95, 0.5);
+    }
+    .generate-btn:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .generate-btn.loading {
+      position: relative;
+      color: transparent;
+    }
+    .generate-btn.loading::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 20px;
+      height: 20px;
+      margin: -10px 0 0 -10px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .keyboard-hint {
+      padding: 14px 20px;
+      background: #f8f6f3;
+      font-size: 12px;
+      color: #6a6a6a;
+      border-top: 1px solid #e8e4df;
+      line-height: 1.8;
+    }
+    .keyboard-hint kbd {
+      background: #fff;
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid #d0ccc5;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: #1e3a5f;
+      margin-right: 4px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #888;
+    }
+    .empty-state p {
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(30, 58, 95, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      display: none;
+    }
+    .modal.active {
+      display: flex;
+    }
+    .modal-content {
+      background: #fff;
+      padding: 28px;
+      border-radius: 8px;
+      min-width: 340px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .modal-content h3 {
+      margin-bottom: 20px;
+      color: #1e3a5f;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .modal-content h3::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 18px;
+      background: #c9a227;
+      margin-right: 12px;
+      vertical-align: middle;
+    }
+    .modal-content label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #4a4a4a;
+    }
+    .modal-content input {
+      width: 100%;
+      padding: 12px;
+      background: #f8f6f3;
+      border: 1px solid #d0ccc5;
+      border-radius: 4px;
+      color: #2c2c2c;
+      font-size: 15px;
+      margin-bottom: 20px;
+    }
+    .modal-content input:focus {
+      outline: none;
+      border-color: #1e3a5f;
+    }
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    .modal-buttons button {
+      padding: 10px 20px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .modal-buttons .cancel {
+      background: #f8f6f3;
+      color: #4a4a4a;
+      border: 1px solid #d0ccc5;
+    }
+    .modal-buttons .cancel:hover {
+      background: #f0ece7;
+    }
+    .modal-buttons .save {
+      background: #1e3a5f;
+      color: #fff;
+    }
+    .modal-buttons .save:hover {
+      background: #2d4a6f;
+    }
+    /* Loading Modal */
+    .loading-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(30, 58, 95, 0.95);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      flex-direction: column;
+    }
+    .loading-modal.active {
+      display: flex;
+    }
+    .loading-container {
+      text-align: center;
+      color: #fff;
+    }
+    .loading-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 30px;
+    }
+    .crane-game {
+      width: 300px;
+      height: 250px;
+      position: relative;
+      margin: 0 auto 30px;
+    }
+    .crane-arm {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 60px;
+      background: #c9a227;
+      animation: craneMove 2s ease-in-out infinite;
+    }
+    .crane-arm::after {
+      content: '';
+      position: absolute;
+      bottom: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 30px;
+      height: 15px;
+      border: 3px solid #c9a227;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+    }
+    .box-container {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 200px;
+      height: 150px;
+      border: 4px solid #c9a227;
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      overflow: hidden;
+    }
+    .boxes {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-content: flex-end;
+      gap: 4px;
+      padding: 4px;
+    }
+    .box {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #c9a227, #d4b03a);
+      border-radius: 4px;
+      animation: boxDrop 0.5s ease-out forwards;
+      opacity: 0;
+    }
+    @keyframes craneMove {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(30px); }
+    }
+    @keyframes boxDrop {
+      0% { transform: translateY(-100px); opacity: 0; }
+      100% { transform: translateY(0); opacity: 1; }
+    }
+    .loading-progress {
+      font-size: 48px;
+      font-weight: 700;
+      color: #c9a227;
+      margin-bottom: 10px;
+    }
+    .loading-status {
+      font-size: 14px;
+      color: rgba(255,255,255,0.7);
+    }
+    .loading-toggle {
+      margin-top: 30px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    .loading-toggle button {
+      padding: 10px 20px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .loading-toggle button:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    .loading-toggle button.active {
+      background: #c9a227;
+      border-color: #c9a227;
+      color: #1e3a5f;
+    }
+    /* AI Assistant Panel */
+    .ai-panel {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      max-width: 600px;
+      width: 100%;
+      padding: 0 20px;
+    }
+    .ai-panel.active {
+      display: flex;
+    }
+    .ai-status {
+      font-size: 13px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    .ai-status.analyzed {
+      color: #4ade80;
+    }
+    .ai-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .ai-btn {
+      padding: 12px 20px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .ai-btn:hover {
+      background: rgba(255,255,255,0.2);
+      border-color: #c9a227;
+    }
+    .ai-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .ai-btn.ai-analyze {
+      background: rgba(74, 222, 128, 0.2);
+      border-color: #4ade80;
+    }
+    .ai-btn.ai-analyze:hover {
+      background: rgba(74, 222, 128, 0.3);
+    }
+    .ai-btn.ai-analyze.done {
+      background: rgba(74, 222, 128, 0.4);
+      color: #4ade80;
+    }
+    .ai-btn.loading {
+      position: relative;
+      color: transparent;
+    }
+    .ai-btn.loading::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 16px;
+      height: 16px;
+      margin: -8px 0 0 -8px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .ai-result {
+      width: 100%;
+      max-height: 300px;
+      overflow-y: auto;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 20px;
+      text-align: left;
+      font-size: 14px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+    .ai-result:empty {
+      display: none;
+    }
+    .ai-result h4 {
+      color: #c9a227;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+    .ai-copy-btn {
+      margin-top: 10px;
+      padding: 8px 16px;
+      background: #c9a227;
+      border: none;
+      color: #1e3a5f;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .ai-copy-btn:hover {
+      background: #d4b03a;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Slide Sync Editor</h1>
+    <div class="file-inputs">
+      <label>
+        PDF を選択
+        <input type="file" id="pdfInput" accept=".pdf">
+      </label>
+      <span class="file-name" id="pdfName">未選択</span>
+      <label>
+        音声を選択
+        <input type="file" id="audioInput" accept="audio/*">
+      </label>
+      <span class="file-name" id="audioName">未選択</span>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <div class="left-panel">
+      <div class="panel-title">スライド一覧</div>
+      <div id="thumbnails">
+        <div class="empty-state">
+          <p>PDFファイルを</p>
+          <p>読み込んでください</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="center-panel">
+      <div class="slide-view">
+        <canvas id="slideCanvas"></canvas>
+      </div>
+      <div class="audio-controls">
+        <div class="time-display">
+          <span id="currentTime">0:00.000</span>
+          <span id="duration">0:00.000</span>
+        </div>
+        <div class="progress-container" id="progressContainer">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="playback-controls">
+          <button class="play-btn" id="playBtn">
+            <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          </button>
+          <div class="speed-control">
+            <span>再生速度:</span>
+            <select id="speedSelect">
+              <option value="0.5">0.5倍</option>
+              <option value="0.75">0.75倍</option>
+              <option value="1" selected>1倍（標準）</option>
+              <option value="1.25">1.25倍</option>
+              <option value="1.5">1.5倍</option>
+              <option value="2">2倍</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="panel-header">
+        <h2>マーカー</h2>
+        <div class="panel-actions">
+          <button id="importBtn">読み込み</button>
+          <button id="exportBtn" class="primary">保存</button>
+        </div>
+      </div>
+      <div class="markers-list" id="markersList">
+        <div class="empty-state">
+          <p>マーカーがありません</p>
+          <p>Mキーでマーカーを追加できます</p>
+        </div>
+      </div>
+      <button class="add-marker-btn" id="addMarkerBtn">＋ マーカーを追加</button>
+      <button class="generate-btn" id="generateBtn">動画を生成</button>
+      <div class="keyboard-hint">
+        <kbd>Space</kbd> 再生/停止
+        <kbd>M</kbd> マーカー追加
+        <kbd>←</kbd><kbd>→</kbd> 5秒移動
+        <kbd>↑</kbd><kbd>↓</kbd> スライド切替
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="editModal">
+    <div class="modal-content">
+      <h3>マーカーを編集</h3>
+      <label>時間（秒）</label>
+      <input type="number" id="editTime" step="0.001" min="0">
+      <label>スライド番号</label>
+      <input type="number" id="editSlide" step="1" min="1">
+      <div class="modal-buttons">
+        <button class="cancel" id="editCancel">キャンセル</button>
+        <button class="save" id="editSave">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="importInput" accept=".json" style="display:none">
+
+  <!-- Loading Modal -->
+  <div class="loading-modal" id="loadingModal">
+    <div class="loading-container" id="loadingAnimation">
+      <div class="loading-title">動画を生成中...</div>
+      <div class="crane-game">
+        <div class="crane-arm"></div>
+        <div class="box-container">
+          <div class="boxes" id="boxes"></div>
+        </div>
+      </div>
+      <div class="loading-progress" id="loadingProgress">0%</div>
+      <div class="loading-status" id="loadingStatus">準備中...</div>
+    </div>
+
+    <div class="ai-panel" id="aiPanel">
+      <div class="loading-title">待ち時間を有効活用</div>
+      <div class="ai-status" id="aiStatus">PDFを分析すると、より正確な結果が得られます</div>
+      <div class="ai-buttons">
+        <button class="ai-btn ai-analyze" id="aiAnalyzeBtn">PDF分析（Gemini）</button>
+        <button class="ai-btn" id="aiSummaryBtn">概要欄を生成</button>
+        <button class="ai-btn" id="aiKeyPointsBtn">キーポイント抽出</button>
+        <button class="ai-btn" id="aiQuizBtn">クイズを生成</button>
+      </div>
+      <div class="ai-result" id="aiResult"></div>
+      <button class="ai-copy-btn" id="aiCopyBtn" style="display:none">コピー</button>
+    </div>
+
+    <div class="loading-toggle">
+      <button id="toggleAnimation" class="active">アニメーション</button>
+      <button id="toggleAI">AI支援</button>
+    </div>
+  </div>
+
+  <audio id="audioPlayer"></audio>
+
+  <script>
+    // PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // State
+    let pdfDoc = null;
+    let pdfFile = null;
+    let audioFile = null;
+    let currentPage = 1;
+    let totalPages = 0;
+    let markers = [];
+    let editingMarkerIndex = -1;
+    let slideThumbnails = {}; // Cache for slide thumbnail data URLs
+
+    // DOM Elements
+    const pdfInput = document.getElementById('pdfInput');
+    const audioInput = document.getElementById('audioInput');
+    const pdfName = document.getElementById('pdfName');
+    const audioName = document.getElementById('audioName');
+    const thumbnails = document.getElementById('thumbnails');
+    const slideCanvas = document.getElementById('slideCanvas');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const playBtn = document.getElementById('playBtn');
+    const playIcon = document.getElementById('playIcon');
+    const pauseIcon = document.getElementById('pauseIcon');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const currentTimeEl = document.getElementById('currentTime');
+    const durationEl = document.getElementById('duration');
+    const speedSelect = document.getElementById('speedSelect');
+    const markersList = document.getElementById('markersList');
+    const addMarkerBtn = document.getElementById('addMarkerBtn');
+    const importBtn = document.getElementById('importBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const importInput = document.getElementById('importInput');
+    const editModal = document.getElementById('editModal');
+    const editTime = document.getElementById('editTime');
+    const editSlide = document.getElementById('editSlide');
+    const editCancel = document.getElementById('editCancel');
+    const editSave = document.getElementById('editSave');
+    const generateBtn = document.getElementById('generateBtn');
+
+    // Format time
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs.toFixed(3).padStart(6, '0')}`;
+    }
+
+    // Load PDF
+    pdfInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      pdfFile = file;
+      pdfName.textContent = file.name;
+      const arrayBuffer = await file.arrayBuffer();
+      pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      totalPages = pdfDoc.numPages;
+
+      renderThumbnails();
+      renderPage(1);
+    });
+
+    // Render thumbnails
+    async function renderThumbnails() {
+      thumbnails.innerHTML = '';
+      slideThumbnails = {}; // Clear cache
+
+      for (let i = 1; i <= totalPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const viewport = page.getViewport({ scale: 0.3 });
+
+        const div = document.createElement('div');
+        div.className = 'thumbnail' + (i === currentPage ? ' active' : '');
+        div.dataset.page = i;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        // Cache thumbnail as data URL for marker list
+        slideThumbnails[i] = canvas.toDataURL('image/png');
+
+        const label = document.createElement('div');
+        label.className = 'thumbnail-label';
+        label.textContent = `${i} / ${totalPages}`;
+
+        div.appendChild(canvas);
+        div.appendChild(label);
+        div.addEventListener('click', () => {
+          currentPage = i;
+          renderPage(i);
+          updateThumbnailSelection();
+        });
+
+        thumbnails.appendChild(div);
+      }
+    }
+
+    // Update thumbnail selection
+    function updateThumbnailSelection() {
+      document.querySelectorAll('.thumbnail').forEach((el, idx) => {
+        el.classList.toggle('active', idx + 1 === currentPage);
+      });
+    }
+
+    // Render page
+    async function renderPage(pageNum) {
+      if (!pdfDoc) return;
+
+      const page = await pdfDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.5 });
+
+      slideCanvas.width = viewport.width;
+      slideCanvas.height = viewport.height;
+
+      const ctx = slideCanvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+    }
+
+    // Load audio
+    audioInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      audioFile = file;
+      audioName.textContent = file.name;
+      audioPlayer.src = URL.createObjectURL(file);
+    });
+
+    // Audio events
+    audioPlayer.addEventListener('loadedmetadata', () => {
+      durationEl.textContent = formatTime(audioPlayer.duration);
+      renderMarkerIndicators();
+    });
+
+    audioPlayer.addEventListener('timeupdate', () => {
+      const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+      progressBar.style.width = `${progress}%`;
+      currentTimeEl.textContent = formatTime(audioPlayer.currentTime);
+      updateCurrentMarker();
+    });
+
+    audioPlayer.addEventListener('play', () => {
+      playIcon.style.display = 'none';
+      pauseIcon.style.display = 'block';
+    });
+
+    audioPlayer.addEventListener('pause', () => {
+      playIcon.style.display = 'block';
+      pauseIcon.style.display = 'none';
+    });
+
+    // Play/Pause
+    playBtn.addEventListener('click', togglePlay);
+
+    function togglePlay() {
+      if (audioPlayer.paused) {
+        audioPlayer.play();
+      } else {
+        audioPlayer.pause();
+      }
+    }
+
+    // Speed
+    speedSelect.addEventListener('change', () => {
+      audioPlayer.playbackRate = parseFloat(speedSelect.value);
+    });
+
+    // Progress seek
+    progressContainer.addEventListener('click', (e) => {
+      if (!audioPlayer.duration) return;
+      const rect = progressContainer.getBoundingClientRect();
+      const ratio = (e.clientX - rect.left) / rect.width;
+      audioPlayer.currentTime = ratio * audioPlayer.duration;
+    });
+
+    // Add marker
+    function addMarker() {
+      if (!audioPlayer.duration || !totalPages) {
+        alert('PDFと音声ファイルを先に読み込んでください');
+        return;
+      }
+
+      const marker = {
+        t: audioPlayer.currentTime,
+        slide: currentPage
+      };
+
+      markers.push(marker);
+      markers.sort((a, b) => a.t - b.t);
+      renderMarkers();
+      renderMarkerIndicators();
+
+      // 自動的に次のスライドに進む
+      if (currentPage < totalPages) {
+        currentPage++;
+        renderPage(currentPage);
+        updateThumbnailSelection();
+      }
+    }
+
+    addMarkerBtn.addEventListener('click', addMarker);
+
+    // Render markers list
+    function renderMarkers() {
+      if (markers.length === 0) {
+        markersList.innerHTML = '<div class="empty-state"><p>マーカーがありません</p><p>Mキーでマーカーを追加できます</p></div>';
+        return;
+      }
+
+      markersList.innerHTML = markers.map((m, i) => `
+        <div class="marker-item" data-index="${i}">
+          <img class="marker-thumb" src="${slideThumbnails[m.slide] || ''}" alt="スライド ${m.slide}">
+          <div class="marker-info">
+            <span class="marker-time">${formatTime(m.t)}</span>
+            <span class="marker-slide">スライド ${m.slide}</span>
+          </div>
+          <div class="marker-actions">
+            <button class="edit" title="編集" onclick="openEditModal(${i})">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            </button>
+            <button class="goto" title="この位置へ移動" onclick="gotoMarker(${i})">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <button class="delete" title="削除" onclick="deleteMarker(${i})">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Render marker indicators on progress bar
+    function renderMarkerIndicators() {
+      document.querySelectorAll('.marker-indicator').forEach(el => el.remove());
+
+      if (!audioPlayer.duration) return;
+
+      markers.forEach(m => {
+        const indicator = document.createElement('div');
+        indicator.className = 'marker-indicator';
+        indicator.style.left = `${(m.t / audioPlayer.duration) * 100}%`;
+        progressContainer.appendChild(indicator);
+      });
+    }
+
+    // Update current marker highlight
+    function updateCurrentMarker() {
+      const currentTime = audioPlayer.currentTime;
+      document.querySelectorAll('.marker-item').forEach((el, i) => {
+        const marker = markers[i];
+        const nextMarker = markers[i + 1];
+        const isCurrent = marker && currentTime >= marker.t && (!nextMarker || currentTime < nextMarker.t);
+        el.classList.toggle('current', isCurrent);
+      });
+    }
+
+    // Go to marker
+    window.gotoMarker = function(index) {
+      const marker = markers[index];
+      if (!marker) return;
+      audioPlayer.currentTime = marker.t;
+      currentPage = marker.slide;
+      renderPage(currentPage);
+      updateThumbnailSelection();
+    };
+
+    // Delete marker
+    window.deleteMarker = function(index) {
+      markers.splice(index, 1);
+      renderMarkers();
+      renderMarkerIndicators();
+    };
+
+    // Edit modal
+    window.openEditModal = function(index) {
+      editingMarkerIndex = index;
+      const marker = markers[index];
+      editTime.value = marker.t.toFixed(3);
+      editSlide.value = marker.slide;
+      editSlide.max = totalPages;
+      editModal.classList.add('active');
+    };
+
+    editCancel.addEventListener('click', () => {
+      editModal.classList.remove('active');
+      editingMarkerIndex = -1;
+    });
+
+    editSave.addEventListener('click', () => {
+      if (editingMarkerIndex < 0) return;
+
+      const t = parseFloat(editTime.value);
+      const slide = parseInt(editSlide.value);
+
+      if (isNaN(t) || t < 0 || t > audioPlayer.duration) {
+        alert('無効な時間です');
+        return;
+      }
+      if (isNaN(slide) || slide < 1 || slide > totalPages) {
+        alert('無効なスライド番号です');
+        return;
+      }
+
+      markers[editingMarkerIndex] = { t, slide };
+      markers.sort((a, b) => a.t - b.t);
+
+      editModal.classList.remove('active');
+      editingMarkerIndex = -1;
+      renderMarkers();
+      renderMarkerIndicators();
+    });
+
+    // Export
+    exportBtn.addEventListener('click', () => {
+      if (markers.length === 0) {
+        alert('保存するマーカーがありません');
+        return;
+      }
+
+      const data = { markers: markers };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'markers.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Import
+    importBtn.addEventListener('click', () => {
+      importInput.click();
+    });
+
+    importInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        if (!data.markers || !Array.isArray(data.markers)) {
+          throw new Error('Invalid markers.json format');
+        }
+
+        markers = data.markers.map(m => ({
+          t: Number(m.t),
+          slide: Number(m.slide)
+        })).filter(m => !isNaN(m.t) && !isNaN(m.slide) && m.t >= 0 && m.slide >= 1);
+
+        markers.sort((a, b) => a.t - b.t);
+        renderMarkers();
+        renderMarkerIndicators();
+      } catch (err) {
+        alert('ファイルの読み込みに失敗しました: ' + err.message);
+      }
+
+      importInput.value = '';
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Ignore if typing in input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+      switch (e.key.toLowerCase()) {
+        case ' ':
+          e.preventDefault();
+          togglePlay();
+          break;
+        case 'm':
+          e.preventDefault();
+          addMarker();
+          break;
+        case 'arrowleft':
+          e.preventDefault();
+          audioPlayer.currentTime = Math.max(0, audioPlayer.currentTime - 5);
+          break;
+        case 'arrowright':
+          e.preventDefault();
+          audioPlayer.currentTime = Math.min(audioPlayer.duration, audioPlayer.currentTime + 5);
+          break;
+        case 'arrowup':
+          e.preventDefault();
+          if (currentPage > 1) {
+            currentPage--;
+            renderPage(currentPage);
+            updateThumbnailSelection();
+          }
+          break;
+        case 'arrowdown':
+          e.preventDefault();
+          if (currentPage < totalPages) {
+            currentPage++;
+            renderPage(currentPage);
+            updateThumbnailSelection();
+          }
+          break;
+      }
+    });
+
+    // Close modal on escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && editModal.classList.contains('active')) {
+        editModal.classList.remove('active');
+        editingMarkerIndex = -1;
+      }
+    });
+
+    // Loading modal elements
+    const loadingModal = document.getElementById('loadingModal');
+    const loadingAnimation = document.getElementById('loadingAnimation');
+    const aiPanel = document.getElementById('aiPanel');
+    const toggleAnimation = document.getElementById('toggleAnimation');
+    const toggleAI = document.getElementById('toggleAI');
+    const loadingProgress = document.getElementById('loadingProgress');
+    const loadingStatus = document.getElementById('loadingStatus');
+    const boxesContainer = document.getElementById('boxes');
+
+    // AI elements
+    const aiAnalyzeBtn = document.getElementById('aiAnalyzeBtn');
+    const aiSummaryBtn = document.getElementById('aiSummaryBtn');
+    const aiKeyPointsBtn = document.getElementById('aiKeyPointsBtn');
+    const aiQuizBtn = document.getElementById('aiQuizBtn');
+    const aiResult = document.getElementById('aiResult');
+    const aiCopyBtn = document.getElementById('aiCopyBtn');
+    const aiStatus = document.getElementById('aiStatus');
+    let pdfAnalyzed = false;
+
+    // Loading state
+    let boxCount = 0;
+    let progressInterval = null;
+    let currentProgress = 0;
+
+    // Show loading modal
+    function showLoadingModal() {
+      loadingModal.classList.add('active');
+      boxCount = 0;
+      currentProgress = 0;
+      boxesContainer.innerHTML = '';
+      loadingProgress.textContent = '0%';
+      loadingStatus.textContent = '準備中...';
+      aiResult.innerHTML = '';
+      aiCopyBtn.style.display = 'none';
+
+      // Start progress simulation
+      progressInterval = setInterval(() => {
+        if (currentProgress < 95) {
+          currentProgress += Math.random() * 3;
+          if (currentProgress > 95) currentProgress = 95;
+          updateProgress(Math.floor(currentProgress));
+        }
+      }, 500);
+    }
+
+    // Update progress
+    function updateProgress(percent) {
+      loadingProgress.textContent = `${percent}%`;
+
+      // Update status text based on progress
+      if (percent < 20) {
+        loadingStatus.textContent = 'PDFを変換中...';
+      } else if (percent < 50) {
+        loadingStatus.textContent = 'スライド画像を生成中...';
+      } else if (percent < 80) {
+        loadingStatus.textContent = '動画をエンコード中...';
+      } else {
+        loadingStatus.textContent = '音声を合成中...';
+      }
+
+      // Add boxes based on progress
+      const targetBoxes = Math.floor(percent / 5);
+      while (boxCount < targetBoxes && boxCount < 20) {
+        addBox();
+      }
+    }
+
+    // Add a box to the container
+    function addBox() {
+      const box = document.createElement('div');
+      box.className = 'box';
+      box.style.animationDelay = `${Math.random() * 0.2}s`;
+      boxesContainer.appendChild(box);
+      boxCount++;
+    }
+
+    // Hide loading modal
+    function hideLoadingModal() {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
+      loadingModal.classList.remove('active');
+    }
+
+    // Complete progress
+    function completeProgress() {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
+      updateProgress(100);
+      loadingStatus.textContent = '完了！';
+    }
+
+    // Toggle between animation and AI panel
+    toggleAnimation.addEventListener('click', () => {
+      loadingAnimation.style.display = 'block';
+      aiPanel.classList.remove('active');
+      toggleAnimation.classList.add('active');
+      toggleAI.classList.remove('active');
+    });
+
+    toggleAI.addEventListener('click', () => {
+      loadingAnimation.style.display = 'none';
+      aiPanel.classList.add('active');
+      toggleAnimation.classList.remove('active');
+      toggleAI.classList.add('active');
+    });
+
+    // AI functions
+    async function callAI(type) {
+      const button = type === 'summary' ? aiSummaryBtn :
+                     type === 'keypoints' ? aiKeyPointsBtn : aiQuizBtn;
+
+      button.disabled = true;
+      button.classList.add('loading');
+      aiResult.innerHTML = '<p>生成中...</p>';
+      aiCopyBtn.style.display = 'none';
+
+      try {
+        const response = await fetch(`/api/ai/${type}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pdfName: pdfFile?.name || '',
+            audioName: audioFile?.name || '',
+            slideCount: totalPages,
+            markers: markers,
+            duration: audioPlayer.duration || 0
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'AI生成に失敗しました');
+        }
+
+        const data = await response.json();
+        aiResult.innerHTML = `<h4>${data.title}</h4><p>${data.content}</p>`;
+        aiCopyBtn.style.display = 'block';
+      } catch (error) {
+        if (error.message.includes('API key') || error.message.includes('OPENAI')) {
+          aiResult.innerHTML = '<p>APIキーが設定されていません。<br>.envファイルにOPENAI_API_KEYを設定してください。</p>';
+        } else {
+          aiResult.innerHTML = `<p>エラー: ${error.message}</p>`;
+        }
+      } finally {
+        button.disabled = false;
+        button.classList.remove('loading');
+      }
+    }
+
+    // PDF分析（Gemini）
+    aiAnalyzeBtn.addEventListener('click', async () => {
+      if (!pdfFile) {
+        aiResult.innerHTML = '<p>PDFファイルを先に読み込んでください</p>';
+        return;
+      }
+
+      aiAnalyzeBtn.disabled = true;
+      aiAnalyzeBtn.classList.add('loading');
+      aiResult.innerHTML = '<p>PDFを分析中... (各スライドを読み取っています)</p>';
+      aiCopyBtn.style.display = 'none';
+
+      try {
+        const formData = new FormData();
+        formData.append('pdf', pdfFile);
+
+        const response = await fetch('/api/ai/analyze', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'PDF分析に失敗しました');
+        }
+
+        const data = await response.json();
+        pdfAnalyzed = true;
+        aiAnalyzeBtn.classList.add('done');
+        aiAnalyzeBtn.textContent = '分析完了 ✓';
+        aiStatus.textContent = `${data.slideCount}枚のスライドを分析しました`;
+        aiStatus.classList.add('analyzed');
+
+        // 結果を表示
+        const summaryText = data.summaries.map(s =>
+          `【スライド${s.slide}】\n${s.summary}`
+        ).join('\n\n');
+        aiResult.innerHTML = `<h4>スライド要約</h4><p>${summaryText.replace(/\n/g, '<br>')}</p>`;
+        aiCopyBtn.style.display = 'block';
+      } catch (error) {
+        if (error.message.includes('GEMINI')) {
+          aiResult.innerHTML = '<p>GEMINI_API_KEYが設定されていません。<br>.envファイルにGEMINI_API_KEYを設定してください。</p>';
+        } else {
+          aiResult.innerHTML = `<p>エラー: ${error.message}</p>`;
+        }
+      } finally {
+        aiAnalyzeBtn.disabled = false;
+        aiAnalyzeBtn.classList.remove('loading');
+      }
+    });
+
+    aiSummaryBtn.addEventListener('click', () => callAI('summary'));
+    aiKeyPointsBtn.addEventListener('click', () => callAI('keypoints'));
+    aiQuizBtn.addEventListener('click', () => callAI('quiz'));
+
+    // Copy AI result
+    aiCopyBtn.addEventListener('click', () => {
+      const text = aiResult.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = aiCopyBtn.textContent;
+        aiCopyBtn.textContent = 'コピーしました！';
+        setTimeout(() => {
+          aiCopyBtn.textContent = originalText;
+        }, 2000);
+      });
+    });
+
+    // Generate video
+    generateBtn.addEventListener('click', async () => {
+      if (!pdfFile || !audioFile) {
+        alert('PDFと音声ファイルを先に読み込んでください');
+        return;
+      }
+
+      // 音声を停止してからローディング表示
+      audioPlayer.pause();
+      showLoadingModal();
+      generateBtn.disabled = true;
+
+      try {
+        const formData = new FormData();
+        formData.append('pdf', pdfFile);
+        formData.append('audio', audioFile);
+        formData.append('markers', JSON.stringify(markers));
+
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || '動画の生成に失敗しました');
+        }
+
+        // Complete the progress animation
+        completeProgress();
+
+        // Download the video
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'slidecast-output.mp4';
+        a.click();
+        URL.revokeObjectURL(url);
+
+        // Wait a moment to show completion
+        setTimeout(() => {
+          hideLoadingModal();
+          alert('動画の生成が完了しました！');
+        }, 1000);
+      } catch (error) {
+        hideLoadingModal();
+        alert('エラー: ' + error.message);
+      } finally {
+        generateBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

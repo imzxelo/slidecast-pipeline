@@ -53,6 +53,8 @@
 - 1コマンドで **MP4が生成**される
 - スライドは「パッパッ」と切り替わる（最低限、等間隔で良い）
 - 必要なら、表示秒数を **CSVで手調整できる**
+- **Slide Sync Editor** で切替マーカーを打ち、`markers.json` を出力できる
+- `markers.json` をCLIに渡し、**手動同期の精度を担保**できる
 - 「同期作業の90%削減」を確実に実現する
 
 ### 2-2. Definition of Done（完了条件）
@@ -60,6 +62,7 @@
 - 出力：`output.mp4`
 - MP4は再生でき、音声が最後まで鳴り、スライドが最後まで表示・切替される
 - `timings.csv` 指定により、一部スライドだけ長く/短くできる
+- Slide Sync Editorで `markers.json` を出力し、CLIで反映できる
 
 ---
 
@@ -81,15 +84,17 @@ Azumaさんから受領した（本リポジトリの動作検証に使う想定
 - 音声長取得（ffprobe）
 - 等間隔でスライド切替を決める
 - 任意で `timings.csv` による秒数上書き
+- **Slide Sync Editor（ローカルWeb）で手動マーカー入力**
+- `markers.json` による切替タイミング指定
 - ffmpegで動画生成（画像連結→音声合体）
 - 依存不足時のエラーメッセージとREADME整備
 
 ### 4-2. Out of Scope（今回やらない）
 - n8n/Drive/Supabase等のクラウド連携
-- GUI、Webアプリ化
 - 文字起こし、OCR、意味理解に基づく自動同期
 - NotebookLM自体の操作自動化（NotebookLM内部での生成手順の自動化）
 - スライドの品質改善（図を綺麗にする等）※別テーマ
+- 高度なデザインやコラボ機能
 
 ---
 
@@ -99,6 +104,7 @@ Azumaさんから受領した（本リポジトリの動作検証に使う想定
 - `--audio`：入力音声（m4a等、ffmpegで読める形式）
 - `--out`：出力MP4パス
 - 任意：`--timings`（CSV）
+- 任意：`--markers`（JSON）
 
 ### FR-2 PDF→PNG変換
 - popplerの `pdftoppm` を利用
@@ -114,6 +120,10 @@ Azumaさんから受領した（本リポジトリの動作検証に使う想定
 - `timings.csv` 指定時：
   - 指定分を固定し、残り時間を未指定スライドへ均等配分
   - 指定合計が音声長を超えたらエラー
+- `markers.json` 指定時：
+  - `markers` の順にスライドを表示する
+  - `dur = next.t - current.t`、最後は `audioDuration - last.t`
+  - durが負/0ならエラー（問題のマーカーを特定表示）
 
 ### FR-5 MP4生成
 - 画像をduration付きで連結して動画化
@@ -124,6 +134,13 @@ Azumaさんから受領した（本リポジトリの動作検証に使う想定
 ### FR-6 中間生成物
 - 変換PNG、concat用ファイルなどを `workdir` に作る
 - `--keep-work` で残せると良い（なければデフォルト削除でも可）
+
+### FR-7 Slide Sync Editor（ローカルWeb）
+- PDFのページ表示、ページ送り、サムネイル一覧
+- 音声の再生/停止/シーク（キーボード操作含む）
+- マーカー追加（現在時刻 + 選択中スライド）
+- マーカー一覧の編集（t/slide/削除）
+- `markers.json` のExport/Import
 
 ---
 

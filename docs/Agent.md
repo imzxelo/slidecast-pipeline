@@ -7,6 +7,7 @@
 今回の納品で重要なのは“完璧な同期”ではなく、以下の体験を確実に出すこと：
 - PDFと音声を入力すると、1コマンドでMP4が生成される（等間隔のスライド切替でOK）
 - 必要に応じて `timings.csv` でスライド表示秒数を上書きできる
+- Slide Sync Editorで手動マーカーを打ち、`markers.json` を反映できる
 - READMEだけで第三者が再現できる（依存インストール含む）
 
 詳細は requirements.md を正とする。
@@ -68,6 +69,8 @@
     - `node ./bin/slidecast.js --pdf ./input/slides.pdf --audio ./input/audio.m4a --out ./dist/output.mp4`
   - timings指定（任意）：
     - `node ./bin/slidecast.js --pdf ./input/slides.pdf --audio ./input/audio.m4a --timings ./input/timings.csv --out ./dist/output.mp4`
+  - markers指定（任意）：
+    - `node ./bin/slidecast.js --pdf ./input/slides.pdf --audio ./input/audio.m4a --markers ./input/markers.json --out ./dist/output.mp4`
 - 失敗したら修正→再実行を必ず行う。
 - `--dry-run` / `--keep-work` がある場合は、デバッグに活用する（中間生成物やコマンドを確認できる状態にする）。
 

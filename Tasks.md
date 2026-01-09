@@ -1,8 +1,10 @@
-# Tasks.md — Slidecast Pipeline Tasks (CLI-only)
+# Tasks.md — Slidecast Pipeline Tasks
 
 ## 目標（納品ライン）
 PDF + 音声 → MP4 を **1コマンドで生成**できる。
-同期は等間隔でOK。必要ならCSVで秒数調整できる。
+等間隔に加えて、**手動マーカーによる同期**ができる。
+Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
+**AI支援機能**で動画制作を効率化する。
 
 ---
 
@@ -12,9 +14,96 @@ PDF + 音声 → MP4 を **1コマンドで生成**できる。
 |-------|------|------|
 | 0 | リポジトリ初期化 | ✅ Done |
 | 1 | 等間隔MP4生成 | ✅ Done |
-| 2 | timings.csv対応 | ⏳ Todo |
-| 3 | 使い勝手向上 | ⏳ Todo |
-| 4 | README整備 | ⏳ Todo |
+| 2 | timings.csv / markers.json 対応 | ✅ Done |
+| 3 | Slide Sync Editor（ローカルWeb） | ✅ Done |
+| 4 | README整備 | ✅ Done |
+| 5 | 使い勝手向上 | ⏳ Todo |
+| 6 | AI自動マーカー生成 | ⏳ Todo |
+
+---
+
+## 既知のバグ（要修正）
+
+### BUG-001: Gemini PDF分析が動作しない 🔴
+- **症状**: 「PDF分析（Gemini）」ボタンを押してもローディングが永遠に続く
+- **原因**: Gemini API呼び出しの実装に問題がある可能性
+- **調査項目**:
+  - [ ] @google/genai パッケージのAPI形式を確認
+  - [ ] サーバーログでエラーを確認
+  - [ ] APIキーが正しく読み込まれているか確認
+- **優先度**: P0
+
+### BUG-002: 動画が保存されない 🔴
+- **症状**: 動画生成が完了しても、ファイルがダウンロードされない
+- **原因**: 調査中
+- **調査項目**:
+  - [ ] サーバー側でファイルが正しく生成されているか確認
+  - [ ] レスポンスが正しく返されているか確認
+  - [ ] フロントエンドのダウンロード処理を確認
+- **優先度**: P0
+
+### BUG-003: OpenAI GPT-5.2 AI機能が動作しない
+- **症状**: AI支援機能のボタンを押してもローディングが続く
+- **原因**: OpenAI Responses API の呼び出し形式に問題がある可能性
+- **調査項目**:
+  - [ ] レスポンス形式を確認（output_text vs 他のフィールド）
+  - [ ] エラーログを確認
+- **優先度**: P1
+
+---
+
+## 完了した変更履歴
+
+### 2026-01-09: Phase 3 拡張 + AI統合
+
+#### 追加機能
+- [x] **UI画面から直接動画生成・ダウンロード**
+  - Expressサーバー（server.js）を追加
+  - `/api/generate` エンドポイントでPDF+音声→MP4変換
+  - multerによるファイルアップロード対応
+
+- [x] **ローディングアニメーション（クレーンゲーム風）**
+  - 動画生成中に楽しいアニメーションを表示
+  - 進捗率とステータスメッセージを表示
+  - 箱がコンテナに落ちていくビジュアル
+
+- [x] **AI支援機能パネル**
+  - 概要欄を生成（OpenAI GPT-5.2）
+  - キーポイント抽出
+  - クイズを生成
+  - アニメーションとAIパネルの切り替え機能
+
+- [x] **OpenAI GPT-5.2 Responses API統合**
+  - 推論モード（reasoning: { effort: 'medium' }）対応
+  - .envファイルからAPIキー読み込み
+
+- [x] **Gemini 3.0 Flash PDF分析機能**（未動作）
+  - @google/genai パッケージ追加
+  - 各スライドを画像として読み取り、内容を要約
+  - `/api/ai/analyze` エンドポイント追加
+
+- [x] **PlaywrightによるUIテスト**
+  - 10テストケース実装
+  - `npx playwright test` で実行可能
+
+#### UX改善
+- [x] **マーカー追加後に自動で次のスライドへ進む**
+- [x] **マーカー一覧にスライドサムネイル画像を表示**
+- [x] **動画生成時に音声を自動停止**
+- [x] **t=0マーカーがない場合、スライド1を自動補完**
+
+#### UIデザイン変更
+- [x] **プロフェッショナル・高級感のあるデザイン**
+  - ネイビー×ゴールド×オフホワイトの配色
+  - Noto Sans JPフォント
+  - 高齢者向けに読みやすいUI
+
+#### ドキュメント
+- [x] **README.md整備**
+  - インストール手順
+  - CLI/Webエディタの使い方
+  - API設定方法
+- [x] **デモ動画用台本**（docs/demo-script.md）
 
 ---
 
@@ -27,48 +116,99 @@ PDF + 音声 → MP4 を **1コマンドで生成**できる。
 
 ---
 
-## Phase 1: 等間隔MP4生成 🔄
+## Phase 1: 等間隔MP4生成 ✅
 
 ### 1-1. 依存コマンドチェック
-- [ ] `ffmpeg` / `ffprobe` / `pdftoppm` の存在確認
-- [ ] 無ければ `brew install ffmpeg poppler` を案内して終了
+- [x] `ffmpeg` / `ffprobe` / `pdftoppm` の存在確認
+- [x] 無ければ `brew install ffmpeg poppler` を案内して終了
 
 ### 1-2. PDF→PNG変換
-- [ ] `pdftoppm -png` でPDF→PNG生成
-- [ ] workdir（一時ディレクトリ）に `slide-0001.png` 形式で保存
+- [x] `pdftoppm -png` でPDF→PNG生成
+- [x] workdir（一時ディレクトリ）に `slide-0001.png` 形式で保存
 
 ### 1-3. 音声duration取得
-- [ ] `ffprobe` で音声長（秒）を取得
-- [ ] 取得失敗時はエラー終了
+- [x] `ffprobe` で音声長（秒）を取得
+- [x] 取得失敗時はエラー終了
 
 ### 1-4. duration配分計算
-- [ ] 音声長 ÷ スライド枚数 で等間隔計算
-- [ ] 端数は最後のスライドに寄せる（合計=音声長を厳守）
+- [x] 音声長 ÷ スライド枚数 で等間隔計算
+- [x] 端数は最後のスライドに寄せる（合計=音声長を厳守）
 
 ### 1-5. ffmpegで動画生成
-- [ ] concat demuxer用の `concat.txt` 生成
-- [ ] 画像→無音動画→音声合体でMP4出力
-- [ ] H.264/AAC、yuv420pで互換性重視
+- [x] concat demuxer用の `concat.txt` 生成
+- [x] 画像→無音動画→音声合体でMP4出力
+- [x] H.264/AAC、yuv420pで互換性重視
 
 ### 1-6. 後処理
-- [ ] `--keep-work` が無ければworkdir削除
+- [x] `--keep-work` が無ければworkdir削除
 
 **DoD**: `node bin/slidecast.js --pdf X --audio Y --out Z` で音声が最後まで鳴り、スライドが最後まで切り替わるMP4が生成される
 
 ---
 
-## Phase 2: timings.csv対応 ⏳
-- [ ] `--timings` オプション追加
-- [ ] CSV読み込み（`index,seconds` 形式、indexは1始まり）
-- [ ] 指定スライドは秒数固定、未指定は残り時間を均等配分
-- [ ] 指定合計 > 音声長 ならエラー
-- [ ] 未指定0枚で残り時間がある場合は最後スライドへ加算
+## Phase 2: timings.csv / markers.json 対応 ✅
+- [x] `--timings` オプション追加（CSV: `index,seconds`、indexは1始まり）
+- [x] 指定スライドは秒数固定、未指定は残り時間を均等配分
+- [x] 指定合計 > 音声長 ならエラー
+- [x] 未指定0枚で残り時間がある場合は最後スライドへ加算
+- [x] `--markers` オプション追加（JSON: `{ markers: [{ t, slide }, ...] }`）
+- [x] `dur = next.t - current.t`、最後は `audioDuration - last.t`
+- [x] durが負/0ならエラー（どのマーカーが問題か表示）
+- [x] markersの順序に従ってスライドを並べ替え可能（飛び/戻り対応）
+- [x] `--timings` と `--markers` の併用はエラー
 
-**DoD**: 任意スライドだけ長く/短くした指定が反映される
+**DoD**: `--timings` と `--markers` のどちらでもMP4生成が成立する
 
 ---
 
-## Phase 3: 使い勝手向上 ⏳
+## Phase 3: Slide Sync Editor（ローカルWeb）✅
+
+### 基本機能
+- [x] PDF表示（ページ送り/サムネイル一覧）
+- [x] 音声再生/停止/シーク（キーボード操作対応）
+- [x] マーカー追加（Mキー）と一覧編集（t/slide/削除）
+- [x] markers.json Export/Import
+- [x] プログレスバー上にマーカー位置を表示
+
+### 動画生成機能
+- [x] UI画面から直接動画生成・ダウンロード
+- [x] Expressサーバー（server.js）
+- [x] ローディングアニメーション（クレーンゲーム風）
+- [x] 動画生成時に音声を自動停止
+
+### AI支援機能
+- [x] 概要欄生成（OpenAI GPT-5.2）
+- [x] キーポイント抽出
+- [x] クイズ生成
+- [x] PDF分析（Gemini 3.0 Flash）※要修正
+- [x] アニメーション/AIパネル切り替え
+
+### UX改善
+- [x] マーカー追加後に次のスライドへ自動切り替え
+- [x] マーカー一覧にスライドサムネイル表示
+- [x] t=0マーカーがない場合の自動補完
+
+### テスト
+- [x] PlaywrightによるUIテスト（10テストケース）
+- [ ] 可能なら簡易波形表示（未実装・オプション）
+
+**DoD**: サンプルPDF+音声でマーカーを打ち、markers.jsonを出力できる。UI画面から動画生成も可能。
+
+---
+
+## Phase 4: README整備 ✅
+- [x] インストール手順（`brew install ffmpeg poppler`）
+- [x] 基本的な使い方（等間隔 / timings / markers）
+- [x] Slide Sync Editorの起動方法
+- [x] AI支援機能の設定方法（OpenAI/Gemini API キー）
+- [ ] markers.jsonの詳細な使い方
+- [ ] トラブルシューティング（依存不足、変換失敗など）
+
+**DoD**: READMEだけで第三者が実行できる
+
+---
+
+## Phase 5: 使い勝手向上 ⏳
 - [ ] `--workdir` 指定対応（未指定時はタイムスタンプ付き一時dir）
 - [ ] `--dry-run` 対応（計算結果・コマンドを表示して終了）
 - [ ] 進捗表示（処理中のステップを出力）
@@ -77,9 +217,130 @@ PDF + 音声 → MP4 を **1コマンドで生成**できる。
 
 ---
 
-## Phase 4: README整備 ⏳
-- [ ] インストール手順（`brew install ffmpeg poppler`）
-- [ ] 基本的な使い方（等間隔 / timings指定）
-- [ ] トラブルシューティング（依存不足、変換失敗など）
+## Phase 6: AI自動マーカー生成 ⏳（新規）
 
-**DoD**: READMEだけで第三者が実行できる
+### 6-1. PDF内容分析
+- [ ] Gemini 3.0 Flash でスライド画像を読み取り
+- [ ] 各スライドの内容を要約してキャッシュ
+- [ ] `/api/ai/analyze` エンドポイントの修正
+
+### 6-2. 音声文字起こし
+- [ ] Whisper API または Google Speech-to-Text で音声をテキスト化
+- [ ] タイムスタンプ付きのトランスクリプト生成
+
+### 6-3. 自動マーカー生成
+- [ ] AIがスライド内容と音声テキストをマッチング
+- [ ] 適切なタイミングでマーカーを自動配置
+- [ ] ユーザーが手動で調整可能
+
+### 6-4. UI統合
+- [ ] 「自動マーカー生成」ボタンを追加
+- [ ] 生成されたマーカーをプレビュー
+- [ ] 確定前に編集可能
+
+**DoD**: PDFと音声をアップロードすると、AIが自動でマーカーを提案する
+
+---
+
+## 今後追加したい機能（バックログ）
+
+### 高優先度
+- [ ] 簡易波形表示（オーディオビジュアライザー）
+- [ ] マーカーのドラッグ&ドロップ編集
+- [ ] アンドゥ/リドゥ機能
+
+### 中優先度
+- [ ] 複数プロジェクトの保存/読み込み
+- [ ] 動画プレビュー機能
+- [ ] エクスポート形式の選択（MP4/WebM等）
+
+### 低優先度
+- [ ] 多言語対応
+- [ ] ダークモード
+- [ ] キーボードショートカットのカスタマイズ
+
+---
+
+## 技術スタック
+
+### フロントエンド
+- HTML/CSS/JavaScript（バニラ）
+- PDF.js（PDF表示）
+- HTML5 Audio API
+
+### バックエンド
+- Node.js + Express
+- multer（ファイルアップロード）
+- dotenv（環境変数）
+
+### 外部API
+- OpenAI GPT-5.2 Responses API（AI生成）
+- Gemini 3.0 Flash（PDF分析）※要修正
+
+### ツール
+- ffmpeg/ffprobe（動画生成）
+- pdftoppm（PDF→PNG変換）
+- Playwright（UIテスト）
+
+---
+
+## テストルール
+
+### 基本方針
+- **テストは必ずダミーデータを使用する**
+- 実際の素材（長時間音声など）は最終確認のみに使用する
+- ダミーデータでの動作確認を優先し、コンテキスト負荷と処理時間を最小化する
+
+### ダミーデータの作成方法
+```bash
+# ダミーPDF（3ページ）を作成
+node -e "
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const doc = new PDFDocument();
+doc.pipe(fs.createWriteStream('test-input/dummy.pdf'));
+for (let i = 1; i <= 3; i++) {
+  if (i > 1) doc.addPage();
+  doc.fontSize(48).text('Slide ' + i, 100, 250);
+}
+doc.end();
+"
+
+# ダミー音声（10秒の無音）を作成
+ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo -t 10 -q:a 9 -acodec libmp3lame test-input/dummy.mp3
+```
+
+### テスト実行
+```bash
+# ダミーデータでテスト
+node bin/slidecast.js --pdf test-input/dummy.pdf --audio test-input/dummy.mp3 --out test-output/test.mp4
+
+# UIテスト
+npx playwright test
+```
+
+### 実素材での最終確認
+- 実素材は **成果物の品質確認** にのみ使用
+- エージェントが自動テストで実素材を使うことは禁止
+
+---
+
+## 環境設定
+
+### 必須
+```bash
+brew install ffmpeg poppler
+npm install
+```
+
+### APIキー設定（.env）
+```
+OPENAI_API_KEY=sk-xxx
+GEMINI_API_KEY=AIza...
+```
+
+### サーバー起動
+```bash
+node server.js
+# → http://localhost:3001
+```
