@@ -12,22 +12,20 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 
 | 項目 | 値 |
 |------|-----|
-| 現在のブランチ | `task/T-021-api-bugfix` |
-| PR | [#3 T-021: API バグ修正（Gemini/OpenAI）](https://github.com/imzxelo/slidecast-pipeline/pull/3) |
+| 現在のブランチ | `task/T-022-cli-improvements` |
+| PR | [#4 T-022: CLI 使い勝手向上 - 進捗表示追加](https://github.com/imzxelo/slidecast-pipeline/pull/4) |
 | PR状態 | ⏳ **OPEN** |
 
 ### PR履歴
 | PR | タイトル | 状態 |
 |----|----------|------|
 | [#2](https://github.com/imzxelo/slidecast-pipeline/pull/2) | T-020: Slide Sync Editor完成 | ✅ MERGED |
-| [#3](https://github.com/imzxelo/slidecast-pipeline/pull/3) | T-021: API バグ修正（Gemini/OpenAI） | ⏳ OPEN |
+| [#3](https://github.com/imzxelo/slidecast-pipeline/pull/3) | T-021: API バグ修正（Gemini/OpenAI） | ✅ MERGED |
+| [#4](https://github.com/imzxelo/slidecast-pipeline/pull/4) | T-022: CLI 使い勝手向上 - 進捗表示追加 | ⏳ OPEN |
 
-### 最近のコミット履歴（task/T-021-api-bugfix）
+### 最近のコミット履歴（task/T-022-cli-improvements）
 ```
-73d98e1 docs: Tasks.mdのコミット履歴を更新
-4159f03 fix: Gemini 3.0 Flash (gemini-3-flash-preview) を使用するよう修正
-fb09393 docs: Tasks.mdにGit/PR情報と変更履歴を追加
-c52f445 fix: Gemini/OpenAI API呼び出しを修正
+0f3bff4 feat: CLI進捗表示を追加 (Phase 5)
 ```
 
 ---
@@ -41,7 +39,7 @@ c52f445 fix: Gemini/OpenAI API呼び出しを修正
 | 2 | timings.csv / markers.json 対応 | ✅ Done |
 | 3 | Slide Sync Editor（ローカルWeb） | ✅ Done |
 | 4 | README整備 | ✅ Done |
-| 5 | 使い勝手向上 | ⏳ Todo |
+| 5 | 使い勝手向上 | ✅ Done |
 | 6 | AI自動マーカー生成 | ⏳ Todo |
 
 ---
@@ -247,12 +245,12 @@ c52f445 fix: Gemini/OpenAI API呼び出しを修正
 
 ---
 
-## Phase 5: 使い勝手向上 ⏳
-- [ ] `--workdir` 指定対応（未指定時はタイムスタンプ付き一時dir）
-- [ ] `--dry-run` 対応（計算結果・コマンドを表示して終了）
-- [ ] 進捗表示（処理中のステップを出力）
+## Phase 5: 使い勝手向上 ✅
+- [x] `--workdir` 指定対応（未指定時はタイムスタンプ付き一時dir）
+- [x] `--dry-run` 対応（計算結果・コマンドを表示して終了）
+- [x] 進捗表示（処理中のステップを出力）
 
-**DoD**: `--dry-run` で何が実行されるか事前確認できる
+**DoD**: `--dry-run` で何が実行されるか事前確認できる ✅
 
 ---
 
