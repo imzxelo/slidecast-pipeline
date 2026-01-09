@@ -278,7 +278,7 @@ async function summarizeSlides(pdfPath) {
       const base64Image = imageData.toString('base64');
 
       const response = await geminiClient.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.0-flash',
         contents: [{
           parts: [
             {
@@ -291,10 +291,7 @@ async function summarizeSlides(pdfPath) {
               text: 'このスライドの内容を日本語で簡潔に要約してください。箇条書きで主要なポイントを3つ以内で挙げてください。'
             }
           ]
-        }],
-        config: {
-          thinkingConfig: { thinkingBudget: 'minimal' }
-        }
+        }]
       });
 
       summaries.push({
@@ -344,8 +341,8 @@ async function callOpenAI(prompt) {
   }
 
   const data = await response.json();
-  // Responses API returns output_text directly
-  return data.output_text;
+  // Responses API returns output in nested structure
+  return data.output?.[0]?.content?.[0]?.text || '';
 }
 
 // Generate summary for video description
@@ -501,13 +498,13 @@ app.listen(PORT, () => {
   if (!OPENAI_API_KEY) {
     console.log('Note: OPENAI_API_KEY is not set. AI generation features will not work.');
   } else {
-    console.log('OpenAI GPT-5.2: enabled');
+    console.log('OpenAI GPT-5.2 (Responses API): enabled');
   }
 
   // Gemini status
   if (!GEMINI_API_KEY) {
     console.log('Note: GEMINI_API_KEY is not set. PDF analysis features will not work.');
   } else {
-    console.log('Gemini 3.0 Flash: enabled');
+    console.log('Gemini 2.0 Flash: enabled');
   }
 });
