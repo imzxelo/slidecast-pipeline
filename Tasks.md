@@ -13,8 +13,8 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 |-------|------|------|
 | 0 | リポジトリ初期化 | ✅ Done |
 | 1 | 等間隔MP4生成 | ✅ Done |
-| 2 | timings.csv / markers.json 対応 | 🔄 Doing |
-| 3 | Slide Sync Editor（ローカルWeb） | 🔄 Doing |
+| 2 | timings.csv / markers.json 対応 | ✅ Done |
+| 3 | Slide Sync Editor（ローカルWeb） | ✅ Done |
 | 4 | README整備 | ⏳ Todo |
 | 5 | 使い勝手向上 | ⏳ Todo |
 
@@ -59,27 +59,27 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 
 ---
 
-## Phase 2: timings.csv / markers.json 対応 🔄
-- [ ] `--timings` オプション追加（CSV: `index,seconds`、indexは1始まり）
-- [ ] 指定スライドは秒数固定、未指定は残り時間を均等配分
-- [ ] 指定合計 > 音声長 ならエラー
-- [ ] 未指定0枚で残り時間がある場合は最後スライドへ加算
-- [ ] `--markers` オプション追加（JSON: `{ markers: [{ t, slide }, ...] }`）
-- [ ] `dur = next.t - current.t`、最後は `audioDuration - last.t`
-- [ ] durが負/0ならエラー（どのマーカーが問題か表示）
-- [ ] markersの順序に従ってスライドを並べ替え可能（飛び/戻り対応）
-- [ ] `--timings` と `--markers` の併用はエラー
+## Phase 2: timings.csv / markers.json 対応 ✅
+- [x] `--timings` オプション追加（CSV: `index,seconds`、indexは1始まり）
+- [x] 指定スライドは秒数固定、未指定は残り時間を均等配分
+- [x] 指定合計 > 音声長 ならエラー
+- [x] 未指定0枚で残り時間がある場合は最後スライドへ加算
+- [x] `--markers` オプション追加（JSON: `{ markers: [{ t, slide }, ...] }`）
+- [x] `dur = next.t - current.t`、最後は `audioDuration - last.t`
+- [x] durが負/0ならエラー（どのマーカーが問題か表示）
+- [x] markersの順序に従ってスライドを並べ替え可能（飛び/戻り対応）
+- [x] `--timings` と `--markers` の併用はエラー
 
 **DoD**: `--timings` と `--markers` のどちらでもMP4生成が成立する
 
 ---
 
-## Phase 3: Slide Sync Editor（ローカルWeb）🔄
-- [ ] PDF表示（ページ送り/サムネイル一覧）
-- [ ] 音声再生/停止/シーク（キーボード操作対応）
-- [ ] マーカー追加（Mキー）と一覧編集（t/slide/削除）
-- [ ] markers.json Export/Import
-- [ ] 可能なら簡易波形表示
+## Phase 3: Slide Sync Editor（ローカルWeb）✅
+- [x] PDF表示（ページ送り/サムネイル一覧）
+- [x] 音声再生/停止/シーク（キーボード操作対応）
+- [x] マーカー追加（Mキー）と一覧編集（t/slide/削除）
+- [x] markers.json Export/Import
+- [ ] 可能なら簡易波形表示（未実装・オプション）
 
 **DoD**: サンプルPDF+音声でマーカーを打ち、markers.jsonを出力できる
 

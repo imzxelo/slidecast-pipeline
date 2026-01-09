@@ -2,3 +2,5 @@ dist/
 work/
 node_modules/
 *.DS_Store
+test-input/
+test-output/
