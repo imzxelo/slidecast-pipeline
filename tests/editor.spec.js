@@ -13,8 +13,8 @@ test.describe('Slide Sync Editor', () => {
 
     // Check header elements
     await expect(page.locator('header h1')).toHaveText('Slide Sync Editor');
-    await expect(page.locator('label:has-text("PDF")')).toBeVisible();
-    await expect(page.locator('label:has-text("Audio")')).toBeVisible();
+    await expect(page.locator('label:has-text("PDF を選択")')).toBeVisible();
+    await expect(page.locator('label:has-text("音声を選択")')).toBeVisible();
   });
 
   test('should have all main panels', async ({ page }) => {
@@ -56,7 +56,7 @@ test.describe('Slide Sync Editor', () => {
 
     // Add marker button
     await expect(page.locator('#addMarkerBtn')).toBeVisible();
-    await expect(page.locator('#addMarkerBtn')).toHaveText('+ マーカーを追加 (M)');
+    await expect(page.locator('#addMarkerBtn')).toHaveText('＋ マーカーを追加');
 
     // Empty state message
     await expect(page.locator('.markers-list .empty-state')).toBeVisible();
@@ -78,7 +78,7 @@ test.describe('Slide Sync Editor', () => {
 
     const emptyState = page.locator('.left-panel .empty-state');
     await expect(emptyState).toBeVisible();
-    await expect(emptyState).toContainText('PDFを読み込んでください');
+    await expect(emptyState).toContainText('PDFファイルを');
   });
 
   test('should toggle speed options', async ({ page }) => {
@@ -115,7 +115,7 @@ test.describe('Slide Sync Editor', () => {
 
     // Setup dialog handler
     page.on('dialog', async dialog => {
-      expect(dialog.message()).toContain('PDFと音声を先に読み込んでください');
+      expect(dialog.message()).toContain('PDFと音声ファイルを先に読み込んでください');
       await dialog.accept();
     });
 

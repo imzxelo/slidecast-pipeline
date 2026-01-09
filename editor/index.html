@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Slide Sync Editor</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     * {
       box-sizing: border-box;
@@ -12,50 +15,65 @@
       padding: 0;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #1a1a2e;
-      color: #eee;
+      font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f5f3f0;
+      color: #2c2c2c;
       height: 100vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
     header {
-      background: #16213e;
-      padding: 12px 20px;
+      background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
+      padding: 16px 28px;
       display: flex;
       align-items: center;
-      gap: 16px;
-      border-bottom: 1px solid #0f3460;
+      gap: 24px;
+      box-shadow: 0 4px 12px rgba(30, 58, 95, 0.3);
     }
     header h1 {
-      font-size: 18px;
-      font-weight: 600;
-      color: #e94560;
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 1px;
+    }
+    header h1::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 22px;
+      background: #c9a227;
+      margin-right: 12px;
+      vertical-align: middle;
     }
     .file-inputs {
       display: flex;
-      gap: 12px;
+      gap: 16px;
       align-items: center;
+      margin-left: auto;
     }
     .file-inputs label {
-      background: #0f3460;
-      padding: 8px 16px;
-      border-radius: 6px;
+      background: rgba(255,255,255,0.15);
+      padding: 10px 20px;
+      border-radius: 4px;
       cursor: pointer;
-      font-size: 13px;
-      transition: background 0.2s;
+      font-size: 14px;
+      font-weight: 500;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.3);
+      transition: all 0.2s;
     }
     .file-inputs label:hover {
-      background: #1a4a7a;
+      background: rgba(255,255,255,0.25);
+      border-color: #c9a227;
     }
     .file-inputs input[type="file"] {
       display: none;
     }
     .file-name {
-      font-size: 12px;
-      color: #888;
-      max-width: 150px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.7);
+      max-width: 160px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -66,23 +84,39 @@
       overflow: hidden;
     }
     .left-panel {
-      width: 180px;
-      background: #16213e;
-      border-right: 1px solid #0f3460;
+      width: 200px;
+      background: #fff;
+      border-right: 1px solid #e0dcd5;
       overflow-y: auto;
-      padding: 12px;
+      padding: 16px;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1e3a5f;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #c9a227;
     }
     .thumbnail {
-      background: #0f3460;
-      border-radius: 6px;
-      margin-bottom: 8px;
+      background: #fff;
+      border-radius: 4px;
+      margin-bottom: 12px;
       cursor: pointer;
       overflow: hidden;
-      border: 2px solid transparent;
-      transition: border-color 0.2s;
+      border: 2px solid #e0dcd5;
+      transition: all 0.2s;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+    .thumbnail:hover {
+      border-color: #1e3a5f;
     }
     .thumbnail.active {
-      border-color: #e94560;
+      border-color: #c9a227;
+      box-shadow: 0 4px 12px rgba(201, 162, 39, 0.3);
     }
     .thumbnail canvas {
       width: 100%;
@@ -90,172 +124,219 @@
     }
     .thumbnail-label {
       text-align: center;
-      padding: 4px;
-      font-size: 11px;
-      color: #aaa;
+      padding: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #4a4a4a;
+      background: #f8f6f3;
     }
     .center-panel {
       flex: 1;
       display: flex;
       flex-direction: column;
-      background: #1a1a2e;
+      background: #eae6e1;
     }
     .slide-view {
       flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding: 24px;
       overflow: hidden;
     }
     .slide-view canvas {
       max-width: 100%;
       max-height: 100%;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+      border: 1px solid #d0ccc5;
     }
     .audio-controls {
-      background: #16213e;
-      padding: 16px 20px;
-      border-top: 1px solid #0f3460;
+      background: #fff;
+      padding: 20px 28px;
+      border-top: 1px solid #e0dcd5;
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
     }
     .time-display {
       display: flex;
       justify-content: space-between;
-      font-size: 13px;
-      color: #888;
-      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #1e3a5f;
+      margin-bottom: 10px;
+      font-family: 'SF Mono', Monaco, monospace;
     }
     .progress-container {
       position: relative;
-      height: 40px;
-      background: #0f3460;
-      border-radius: 4px;
+      height: 12px;
+      background: #e8e4df;
+      border-radius: 6px;
       cursor: pointer;
-      margin-bottom: 12px;
+      margin-bottom: 16px;
+      border: 1px solid #d0ccc5;
+      overflow: hidden;
     }
     .progress-bar {
       height: 100%;
-      background: linear-gradient(90deg, #e94560, #ff6b6b);
-      border-radius: 4px;
+      background: linear-gradient(90deg, #1e3a5f, #2d5a8f);
+      border-radius: 6px;
       width: 0%;
       transition: width 0.1s linear;
     }
     .marker-indicator {
       position: absolute;
-      top: 0;
-      width: 3px;
-      height: 100%;
-      background: #4ade80;
+      top: -2px;
+      width: 4px;
+      height: 16px;
+      background: #c9a227;
+      border-radius: 2px;
       transform: translateX(-50%);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
     .playback-controls {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 20px;
     }
     .play-btn {
-      width: 48px;
-      height: 48px;
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
-      background: #e94560;
+      background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
       border: none;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: transform 0.1s;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(30, 58, 95, 0.4);
     }
     .play-btn:hover {
       transform: scale(1.05);
+      box-shadow: 0 6px 16px rgba(30, 58, 95, 0.5);
     }
     .play-btn:active {
-      transform: scale(0.95);
+      transform: scale(0.98);
     }
     .play-btn svg {
       fill: white;
-      width: 20px;
-      height: 20px;
+      width: 22px;
+      height: 22px;
     }
     .speed-control {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 13px;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #4a4a4a;
     }
     .speed-control select {
-      background: #0f3460;
-      color: #eee;
-      border: none;
-      padding: 6px 10px;
+      background: #f8f6f3;
+      color: #2c2c2c;
+      border: 1px solid #d0ccc5;
+      padding: 8px 12px;
       border-radius: 4px;
       cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .speed-control select:focus {
+      outline: none;
+      border-color: #1e3a5f;
     }
     .right-panel {
-      width: 320px;
-      background: #16213e;
-      border-left: 1px solid #0f3460;
+      width: 340px;
+      background: #fff;
+      border-left: 1px solid #e0dcd5;
       display: flex;
       flex-direction: column;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.05);
     }
     .panel-header {
-      padding: 12px 16px;
-      border-bottom: 1px solid #0f3460;
+      padding: 16px 20px;
+      border-bottom: 1px solid #e0dcd5;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      background: #f8f6f3;
     }
     .panel-header h2 {
-      font-size: 14px;
-      font-weight: 600;
+      font-size: 15px;
+      font-weight: 700;
+      color: #1e3a5f;
+      letter-spacing: 0.5px;
+    }
+    .panel-header h2::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 15px;
+      background: #c9a227;
+      margin-right: 10px;
+      vertical-align: middle;
     }
     .panel-actions {
       display: flex;
       gap: 8px;
     }
     .panel-actions button {
-      background: #0f3460;
-      border: none;
-      color: #eee;
-      padding: 6px 12px;
+      background: #fff;
+      border: 1px solid #d0ccc5;
+      color: #4a4a4a;
+      padding: 8px 14px;
       border-radius: 4px;
-      font-size: 12px;
+      font-size: 13px;
+      font-weight: 500;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: all 0.2s;
     }
     .panel-actions button:hover {
-      background: #1a4a7a;
+      border-color: #1e3a5f;
+      color: #1e3a5f;
     }
     .panel-actions button.primary {
-      background: #e94560;
+      background: #1e3a5f;
+      border-color: #1e3a5f;
+      color: #fff;
     }
     .panel-actions button.primary:hover {
-      background: #ff6b6b;
+      background: #2d4a6f;
     }
     .markers-list {
       flex: 1;
       overflow-y: auto;
-      padding: 12px;
+      padding: 16px;
     }
     .marker-item {
-      background: #0f3460;
+      background: #f8f6f3;
       border-radius: 6px;
-      padding: 10px 12px;
-      margin-bottom: 8px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
+      border: 1px solid #e8e4df;
+      transition: all 0.2s;
+    }
+    .marker-item:hover {
+      border-color: #d0ccc5;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
     .marker-item.current {
-      border-left: 3px solid #4ade80;
+      border-left: 4px solid #c9a227;
+      background: #fffdf8;
     }
     .marker-time {
       font-family: 'SF Mono', Monaco, monospace;
-      font-size: 13px;
-      color: #4ade80;
-      min-width: 70px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #1e3a5f;
+      min-width: 80px;
     }
     .marker-slide {
-      font-size: 13px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #4a4a4a;
       flex: 1;
     }
     .marker-actions {
@@ -264,55 +345,69 @@
     }
     .marker-actions button {
       background: transparent;
-      border: none;
+      border: 1px solid transparent;
       color: #888;
       cursor: pointer;
-      padding: 4px;
+      padding: 6px;
       border-radius: 4px;
-      transition: color 0.2s, background 0.2s;
+      transition: all 0.2s;
     }
     .marker-actions button:hover {
-      color: #eee;
-      background: rgba(255,255,255,0.1);
+      color: #1e3a5f;
+      background: #f0ece7;
+      border-color: #e0dcd5;
     }
     .marker-actions button.delete:hover {
-      color: #e94560;
+      color: #c0392b;
+      background: #fdf2f2;
+      border-color: #f5c6cb;
     }
     .add-marker-btn {
-      margin: 12px;
-      padding: 12px;
-      background: #4ade80;
-      color: #1a1a2e;
+      margin: 16px;
+      padding: 14px;
+      background: linear-gradient(135deg, #c9a227 0%, #d4b03a 100%);
+      color: #fff;
       border: none;
       border-radius: 6px;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(201, 162, 39, 0.3);
+      letter-spacing: 0.5px;
     }
     .add-marker-btn:hover {
-      background: #22c55e;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(201, 162, 39, 0.4);
     }
     .keyboard-hint {
-      padding: 12px 16px;
-      background: #0f3460;
-      font-size: 11px;
-      color: #888;
-      border-top: 1px solid #1a4a7a;
+      padding: 14px 20px;
+      background: #f8f6f3;
+      font-size: 12px;
+      color: #6a6a6a;
+      border-top: 1px solid #e8e4df;
+      line-height: 1.8;
     }
     .keyboard-hint kbd {
-      background: #16213e;
-      padding: 2px 6px;
-      border-radius: 3px;
+      background: #fff;
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid #d0ccc5;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: #1e3a5f;
       margin-right: 4px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
     .empty-state {
       text-align: center;
       padding: 40px 20px;
-      color: #666;
+      color: #888;
     }
     .empty-state p {
       margin-bottom: 8px;
+      font-size: 14px;
     }
     .modal {
       position: fixed;
@@ -320,7 +415,7 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0,0,0,0.7);
+      background: rgba(30, 58, 95, 0.6);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -331,49 +426,75 @@
       display: flex;
     }
     .modal-content {
-      background: #16213e;
-      padding: 24px;
-      border-radius: 12px;
-      min-width: 300px;
+      background: #fff;
+      padding: 28px;
+      border-radius: 8px;
+      min-width: 340px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     }
     .modal-content h3 {
-      margin-bottom: 16px;
+      margin-bottom: 20px;
+      color: #1e3a5f;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .modal-content h3::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 18px;
+      background: #c9a227;
+      margin-right: 12px;
+      vertical-align: middle;
     }
     .modal-content label {
       display: block;
       margin-bottom: 8px;
       font-size: 13px;
-      color: #aaa;
+      font-weight: 600;
+      color: #4a4a4a;
     }
     .modal-content input {
       width: 100%;
-      padding: 10px;
-      background: #0f3460;
-      border: 1px solid #1a4a7a;
-      border-radius: 6px;
-      color: #eee;
-      font-size: 14px;
-      margin-bottom: 16px;
+      padding: 12px;
+      background: #f8f6f3;
+      border: 1px solid #d0ccc5;
+      border-radius: 4px;
+      color: #2c2c2c;
+      font-size: 15px;
+      margin-bottom: 20px;
+    }
+    .modal-content input:focus {
+      outline: none;
+      border-color: #1e3a5f;
     }
     .modal-buttons {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       justify-content: flex-end;
     }
     .modal-buttons button {
-      padding: 8px 16px;
-      border-radius: 6px;
+      padding: 10px 20px;
+      border-radius: 4px;
       border: none;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 14px;
+      font-weight: 600;
     }
     .modal-buttons .cancel {
-      background: #0f3460;
-      color: #eee;
+      background: #f8f6f3;
+      color: #4a4a4a;
+      border: 1px solid #d0ccc5;
+    }
+    .modal-buttons .cancel:hover {
+      background: #f0ece7;
     }
     .modal-buttons .save {
-      background: #4ade80;
-      color: #1a1a2e;
+      background: #1e3a5f;
+      color: #fff;
+    }
+    .modal-buttons .save:hover {
+      background: #2d4a6f;
     }
   </style>
 </head>
@@ -382,22 +503,26 @@
     <h1>Slide Sync Editor</h1>
     <div class="file-inputs">
       <label>
-        PDF
+        PDF を選択
         <input type="file" id="pdfInput" accept=".pdf">
       </label>
-      <span class="file-name" id="pdfName">-</span>
+      <span class="file-name" id="pdfName">未選択</span>
       <label>
-        Audio
+        音声を選択
         <input type="file" id="audioInput" accept="audio/*">
       </label>
-      <span class="file-name" id="audioName">-</span>
+      <span class="file-name" id="audioName">未選択</span>
     </div>
   </header>
 
   <div class="main-container">
-    <div class="left-panel" id="thumbnails">
-      <div class="empty-state">
-        <p>PDFを読み込んでください</p>
+    <div class="left-panel">
+      <div class="panel-title">スライド一覧</div>
+      <div id="thumbnails">
+        <div class="empty-state">
+          <p>PDFファイルを</p>
+          <p>読み込んでください</p>
+        </div>
       </div>
     </div>
 
@@ -419,14 +544,14 @@
             <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
           </button>
           <div class="speed-control">
-            <span>Speed:</span>
+            <span>再生速度:</span>
             <select id="speedSelect">
-              <option value="0.5">0.5x</option>
-              <option value="0.75">0.75x</option>
-              <option value="1" selected>1x</option>
-              <option value="1.25">1.25x</option>
-              <option value="1.5">1.5x</option>
-              <option value="2">2x</option>
+              <option value="0.5">0.5倍</option>
+              <option value="0.75">0.75倍</option>
+              <option value="1" selected>1倍（標準）</option>
+              <option value="1.25">1.25倍</option>
+              <option value="1.5">1.5倍</option>
+              <option value="2">2倍</option>
             </select>
           </div>
         </div>
@@ -435,24 +560,24 @@
 
     <div class="right-panel">
       <div class="panel-header">
-        <h2>Markers</h2>
+        <h2>マーカー</h2>
         <div class="panel-actions">
-          <button id="importBtn">Import</button>
-          <button id="exportBtn" class="primary">Export</button>
+          <button id="importBtn">読み込み</button>
+          <button id="exportBtn" class="primary">保存</button>
         </div>
       </div>
       <div class="markers-list" id="markersList">
         <div class="empty-state">
           <p>マーカーがありません</p>
-          <p>Mキーでマーカーを追加</p>
+          <p>Mキーでマーカーを追加できます</p>
         </div>
       </div>
-      <button class="add-marker-btn" id="addMarkerBtn">+ マーカーを追加 (M)</button>
+      <button class="add-marker-btn" id="addMarkerBtn">＋ マーカーを追加</button>
       <div class="keyboard-hint">
         <kbd>Space</kbd> 再生/停止
         <kbd>M</kbd> マーカー追加
-        <kbd>←/→</kbd> 5秒シーク
-        <kbd>↑/↓</kbd> スライド切替
+        <kbd>←</kbd><kbd>→</kbd> 5秒移動
+        <kbd>↑</kbd><kbd>↓</kbd> スライド切替
       </div>
     </div>
   </div>
@@ -460,7 +585,7 @@
   <div class="modal" id="editModal">
     <div class="modal-content">
       <h3>マーカーを編集</h3>
-      <label>時間 (秒)</label>
+      <label>時間（秒）</label>
       <input type="number" id="editTime" step="0.001" min="0">
       <label>スライド番号</label>
       <input type="number" id="editSlide" step="1" min="1">
@@ -554,7 +679,7 @@
 
         const label = document.createElement('div');
         label.className = 'thumbnail-label';
-        label.textContent = `Slide ${i}`;
+        label.textContent = `${i} / ${totalPages}`;
 
         div.appendChild(canvas);
         div.appendChild(label);
@@ -648,7 +773,7 @@
     // Add marker
     function addMarker() {
       if (!audioPlayer.duration || !totalPages) {
-        alert('PDFと音声を先に読み込んでください');
+        alert('PDFと音声ファイルを先に読み込んでください');
         return;
       }
 
@@ -668,19 +793,19 @@
     // Render markers list
     function renderMarkers() {
       if (markers.length === 0) {
-        markersList.innerHTML = '<div class="empty-state"><p>マーカーがありません</p><p>Mキーでマーカーを追加</p></div>';
+        markersList.innerHTML = '<div class="empty-state"><p>マーカーがありません</p><p>Mキーでマーカーを追加できます</p></div>';
         return;
       }
 
       markersList.innerHTML = markers.map((m, i) => `
         <div class="marker-item" data-index="${i}">
           <span class="marker-time">${formatTime(m.t)}</span>
-          <span class="marker-slide">Slide ${m.slide}</span>
+          <span class="marker-slide">スライド ${m.slide}</span>
           <div class="marker-actions">
             <button class="edit" title="編集" onclick="openEditModal(${i})">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
             </button>
-            <button class="goto" title="移動" onclick="gotoMarker(${i})">
+            <button class="goto" title="この位置へ移動" onclick="gotoMarker(${i})">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
             </button>
             <button class="delete" title="削除" onclick="deleteMarker(${i})">
@@ -775,7 +900,7 @@
     // Export
     exportBtn.addEventListener('click', () => {
       if (markers.length === 0) {
-        alert('エクスポートするマーカーがありません');
+        alert('保存するマーカーがありません');
         return;
       }
 
@@ -815,7 +940,7 @@
         renderMarkers();
         renderMarkerIndicators();
       } catch (err) {
-        alert('JSONの読み込みに失敗しました: ' + err.message);
+        alert('ファイルの読み込みに失敗しました: ' + err.message);
       }
 
       importInput.value = '';
