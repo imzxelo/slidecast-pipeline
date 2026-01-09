@@ -4,3 +4,8 @@ node_modules/
 *.DS_Store
 test-input/
 test-output/
+uploads/
+
+# Environment variables (contains API keys)
+.env
+.env.local

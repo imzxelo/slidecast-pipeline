@@ -15,7 +15,7 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 | 1 | 等間隔MP4生成 | ✅ Done |
 | 2 | timings.csv / markers.json 対応 | ✅ Done |
 | 3 | Slide Sync Editor（ローカルWeb） | ✅ Done |
-| 4 | README整備 | ⏳ Todo |
+| 4 | README整備 | ✅ Done |
 | 5 | 使い勝手向上 | ⏳ Todo |
 
 ---
@@ -79,17 +79,24 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 - [x] 音声再生/停止/シーク（キーボード操作対応）
 - [x] マーカー追加（Mキー）と一覧編集（t/slide/削除）
 - [x] markers.json Export/Import
+- [x] UI画面から直接動画生成・ダウンロード機能
+- [x] Expressサーバー（server.js）による動画生成API
+- [x] ローディングアニメーション（クレーンゲーム風）
+- [x] AI支援機能（概要欄生成/キーポイント抽出/クイズ生成）
+- [x] OpenAI GPT-5.2 Responses API統合（推論モード対応）
+- [x] PlaywrightによるUIテスト（10テストケース）
 - [ ] 可能なら簡易波形表示（未実装・オプション）
 
-**DoD**: サンプルPDF+音声でマーカーを打ち、markers.jsonを出力できる
+**DoD**: サンプルPDF+音声でマーカーを打ち、markers.jsonを出力できる。UI画面から動画生成も可能。
 
 ---
 
-## Phase 4: README整備 ⏳
-- [ ] インストール手順（`brew install ffmpeg poppler`）
-- [ ] 基本的な使い方（等間隔 / timings / markers）
-- [ ] Slide Sync Editorの起動方法
-- [ ] markers.jsonの使い方
+## Phase 4: README整備 ✅
+- [x] インストール手順（`brew install ffmpeg poppler`）
+- [x] 基本的な使い方（等間隔 / timings / markers）
+- [x] Slide Sync Editorの起動方法
+- [x] AI支援機能の設定方法（OpenAI API キー）
+- [ ] markers.jsonの詳細な使い方
 - [ ] トラブルシューティング（依存不足、変換失敗など）
 
 **DoD**: READMEだけで第三者が実行できる

@@ -363,7 +363,7 @@
       border-color: #f5c6cb;
     }
     .add-marker-btn {
-      margin: 16px;
+      margin: 16px 16px 8px 16px;
       padding: 14px;
       background: linear-gradient(135deg, #c9a227 0%, #d4b03a 100%);
       color: #fff;
@@ -379,6 +379,50 @@
     .add-marker-btn:hover {
       transform: translateY(-1px);
       box-shadow: 0 6px 16px rgba(201, 162, 39, 0.4);
+    }
+    .generate-btn {
+      margin: 8px 16px 16px 16px;
+      padding: 16px;
+      background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(30, 58, 95, 0.4);
+      letter-spacing: 1px;
+    }
+    .generate-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(30, 58, 95, 0.5);
+    }
+    .generate-btn:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .generate-btn.loading {
+      position: relative;
+      color: transparent;
+    }
+    .generate-btn.loading::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 20px;
+      height: 20px;
+      margin: -10px 0 0 -10px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
     .keyboard-hint {
       padding: 14px 20px;
@@ -496,6 +540,223 @@
     .modal-buttons .save:hover {
       background: #2d4a6f;
     }
+    /* Loading Modal */
+    .loading-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(30, 58, 95, 0.95);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      flex-direction: column;
+    }
+    .loading-modal.active {
+      display: flex;
+    }
+    .loading-container {
+      text-align: center;
+      color: #fff;
+    }
+    .loading-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 30px;
+    }
+    .crane-game {
+      width: 300px;
+      height: 250px;
+      position: relative;
+      margin: 0 auto 30px;
+    }
+    .crane-arm {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 60px;
+      background: #c9a227;
+      animation: craneMove 2s ease-in-out infinite;
+    }
+    .crane-arm::after {
+      content: '';
+      position: absolute;
+      bottom: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 30px;
+      height: 15px;
+      border: 3px solid #c9a227;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+    }
+    .box-container {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 200px;
+      height: 150px;
+      border: 4px solid #c9a227;
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      overflow: hidden;
+    }
+    .boxes {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-content: flex-end;
+      gap: 4px;
+      padding: 4px;
+    }
+    .box {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #c9a227, #d4b03a);
+      border-radius: 4px;
+      animation: boxDrop 0.5s ease-out forwards;
+      opacity: 0;
+    }
+    @keyframes craneMove {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(30px); }
+    }
+    @keyframes boxDrop {
+      0% { transform: translateY(-100px); opacity: 0; }
+      100% { transform: translateY(0); opacity: 1; }
+    }
+    .loading-progress {
+      font-size: 48px;
+      font-weight: 700;
+      color: #c9a227;
+      margin-bottom: 10px;
+    }
+    .loading-status {
+      font-size: 14px;
+      color: rgba(255,255,255,0.7);
+    }
+    .loading-toggle {
+      margin-top: 30px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    .loading-toggle button {
+      padding: 10px 20px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .loading-toggle button:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    .loading-toggle button.active {
+      background: #c9a227;
+      border-color: #c9a227;
+      color: #1e3a5f;
+    }
+    /* AI Assistant Panel */
+    .ai-panel {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      max-width: 600px;
+      width: 100%;
+      padding: 0 20px;
+    }
+    .ai-panel.active {
+      display: flex;
+    }
+    .ai-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .ai-btn {
+      padding: 12px 20px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .ai-btn:hover {
+      background: rgba(255,255,255,0.2);
+      border-color: #c9a227;
+    }
+    .ai-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .ai-btn.loading {
+      position: relative;
+      color: transparent;
+    }
+    .ai-btn.loading::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 16px;
+      height: 16px;
+      margin: -8px 0 0 -8px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .ai-result {
+      width: 100%;
+      max-height: 300px;
+      overflow-y: auto;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 20px;
+      text-align: left;
+      font-size: 14px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+    .ai-result:empty {
+      display: none;
+    }
+    .ai-result h4 {
+      color: #c9a227;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+    .ai-copy-btn {
+      margin-top: 10px;
+      padding: 8px 16px;
+      background: #c9a227;
+      border: none;
+      color: #1e3a5f;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .ai-copy-btn:hover {
+      background: #d4b03a;
+    }
   </style>
 </head>
 <body>
@@ -573,6 +834,7 @@
         </div>
       </div>
       <button class="add-marker-btn" id="addMarkerBtn">＋ マーカーを追加</button>
+      <button class="generate-btn" id="generateBtn">動画を生成</button>
       <div class="keyboard-hint">
         <kbd>Space</kbd> 再生/停止
         <kbd>M</kbd> マーカー追加
@@ -598,6 +860,37 @@
 
   <input type="file" id="importInput" accept=".json" style="display:none">
 
+  <!-- Loading Modal -->
+  <div class="loading-modal" id="loadingModal">
+    <div class="loading-container" id="loadingAnimation">
+      <div class="loading-title">動画を生成中...</div>
+      <div class="crane-game">
+        <div class="crane-arm"></div>
+        <div class="box-container">
+          <div class="boxes" id="boxes"></div>
+        </div>
+      </div>
+      <div class="loading-progress" id="loadingProgress">0%</div>
+      <div class="loading-status" id="loadingStatus">準備中...</div>
+    </div>
+
+    <div class="ai-panel" id="aiPanel">
+      <div class="loading-title">待ち時間を有効活用</div>
+      <div class="ai-buttons">
+        <button class="ai-btn" id="aiSummaryBtn">概要欄を生成</button>
+        <button class="ai-btn" id="aiKeyPointsBtn">キーポイント抽出</button>
+        <button class="ai-btn" id="aiQuizBtn">クイズを生成</button>
+      </div>
+      <div class="ai-result" id="aiResult"></div>
+      <button class="ai-copy-btn" id="aiCopyBtn" style="display:none">コピー</button>
+    </div>
+
+    <div class="loading-toggle">
+      <button id="toggleAnimation" class="active">アニメーション</button>
+      <button id="toggleAI">AI支援</button>
+    </div>
+  </div>
+
   <audio id="audioPlayer"></audio>
 
   <script>
@@ -606,6 +899,8 @@
 
     // State
     let pdfDoc = null;
+    let pdfFile = null;
+    let audioFile = null;
     let currentPage = 1;
     let totalPages = 0;
     let markers = [];
@@ -637,6 +932,7 @@
     const editSlide = document.getElementById('editSlide');
     const editCancel = document.getElementById('editCancel');
     const editSave = document.getElementById('editSave');
+    const generateBtn = document.getElementById('generateBtn');
 
     // Format time
     function formatTime(seconds) {
@@ -650,6 +946,7 @@
       const file = e.target.files[0];
       if (!file) return;
 
+      pdfFile = file;
       pdfName.textContent = file.name;
       const arrayBuffer = await file.arrayBuffer();
       pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -719,6 +1016,7 @@
       const file = e.target.files[0];
       if (!file) return;
 
+      audioFile = file;
       audioName.textContent = file.name;
       audioPlayer.src = URL.createObjectURL(file);
     });
@@ -992,6 +1290,225 @@
       if (e.key === 'Escape' && editModal.classList.contains('active')) {
         editModal.classList.remove('active');
         editingMarkerIndex = -1;
+      }
+    });
+
+    // Loading modal elements
+    const loadingModal = document.getElementById('loadingModal');
+    const loadingAnimation = document.getElementById('loadingAnimation');
+    const aiPanel = document.getElementById('aiPanel');
+    const toggleAnimation = document.getElementById('toggleAnimation');
+    const toggleAI = document.getElementById('toggleAI');
+    const loadingProgress = document.getElementById('loadingProgress');
+    const loadingStatus = document.getElementById('loadingStatus');
+    const boxesContainer = document.getElementById('boxes');
+
+    // AI elements
+    const aiSummaryBtn = document.getElementById('aiSummaryBtn');
+    const aiKeyPointsBtn = document.getElementById('aiKeyPointsBtn');
+    const aiQuizBtn = document.getElementById('aiQuizBtn');
+    const aiResult = document.getElementById('aiResult');
+    const aiCopyBtn = document.getElementById('aiCopyBtn');
+
+    // Loading state
+    let boxCount = 0;
+    let progressInterval = null;
+    let currentProgress = 0;
+
+    // Show loading modal
+    function showLoadingModal() {
+      loadingModal.classList.add('active');
+      boxCount = 0;
+      currentProgress = 0;
+      boxesContainer.innerHTML = '';
+      loadingProgress.textContent = '0%';
+      loadingStatus.textContent = '準備中...';
+      aiResult.innerHTML = '';
+      aiCopyBtn.style.display = 'none';
+
+      // Start progress simulation
+      progressInterval = setInterval(() => {
+        if (currentProgress < 95) {
+          currentProgress += Math.random() * 3;
+          if (currentProgress > 95) currentProgress = 95;
+          updateProgress(Math.floor(currentProgress));
+        }
+      }, 500);
+    }
+
+    // Update progress
+    function updateProgress(percent) {
+      loadingProgress.textContent = `${percent}%`;
+
+      // Update status text based on progress
+      if (percent < 20) {
+        loadingStatus.textContent = 'PDFを変換中...';
+      } else if (percent < 50) {
+        loadingStatus.textContent = 'スライド画像を生成中...';
+      } else if (percent < 80) {
+        loadingStatus.textContent = '動画をエンコード中...';
+      } else {
+        loadingStatus.textContent = '音声を合成中...';
+      }
+
+      // Add boxes based on progress
+      const targetBoxes = Math.floor(percent / 5);
+      while (boxCount < targetBoxes && boxCount < 20) {
+        addBox();
+      }
+    }
+
+    // Add a box to the container
+    function addBox() {
+      const box = document.createElement('div');
+      box.className = 'box';
+      box.style.animationDelay = `${Math.random() * 0.2}s`;
+      boxesContainer.appendChild(box);
+      boxCount++;
+    }
+
+    // Hide loading modal
+    function hideLoadingModal() {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
+      loadingModal.classList.remove('active');
+    }
+
+    // Complete progress
+    function completeProgress() {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
+      updateProgress(100);
+      loadingStatus.textContent = '完了！';
+    }
+
+    // Toggle between animation and AI panel
+    toggleAnimation.addEventListener('click', () => {
+      loadingAnimation.style.display = 'block';
+      aiPanel.classList.remove('active');
+      toggleAnimation.classList.add('active');
+      toggleAI.classList.remove('active');
+    });
+
+    toggleAI.addEventListener('click', () => {
+      loadingAnimation.style.display = 'none';
+      aiPanel.classList.add('active');
+      toggleAnimation.classList.remove('active');
+      toggleAI.classList.add('active');
+    });
+
+    // AI functions
+    async function callAI(type) {
+      const button = type === 'summary' ? aiSummaryBtn :
+                     type === 'keypoints' ? aiKeyPointsBtn : aiQuizBtn;
+
+      button.disabled = true;
+      button.classList.add('loading');
+      aiResult.innerHTML = '<p>生成中...</p>';
+      aiCopyBtn.style.display = 'none';
+
+      try {
+        const response = await fetch(`/api/ai/${type}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pdfName: pdfFile?.name || '',
+            audioName: audioFile?.name || '',
+            slideCount: totalPages,
+            markers: markers,
+            duration: audioPlayer.duration || 0
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'AI生成に失敗しました');
+        }
+
+        const data = await response.json();
+        aiResult.innerHTML = `<h4>${data.title}</h4><p>${data.content}</p>`;
+        aiCopyBtn.style.display = 'block';
+      } catch (error) {
+        if (error.message.includes('API key') || error.message.includes('OPENAI')) {
+          aiResult.innerHTML = '<p>APIキーが設定されていません。<br>.envファイルにOPENAI_API_KEYを設定してください。</p>';
+        } else {
+          aiResult.innerHTML = `<p>エラー: ${error.message}</p>`;
+        }
+      } finally {
+        button.disabled = false;
+        button.classList.remove('loading');
+      }
+    }
+
+    aiSummaryBtn.addEventListener('click', () => callAI('summary'));
+    aiKeyPointsBtn.addEventListener('click', () => callAI('keypoints'));
+    aiQuizBtn.addEventListener('click', () => callAI('quiz'));
+
+    // Copy AI result
+    aiCopyBtn.addEventListener('click', () => {
+      const text = aiResult.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = aiCopyBtn.textContent;
+        aiCopyBtn.textContent = 'コピーしました！';
+        setTimeout(() => {
+          aiCopyBtn.textContent = originalText;
+        }, 2000);
+      });
+    });
+
+    // Generate video
+    generateBtn.addEventListener('click', async () => {
+      if (!pdfFile || !audioFile) {
+        alert('PDFと音声ファイルを先に読み込んでください');
+        return;
+      }
+
+      // Show loading modal
+      showLoadingModal();
+      generateBtn.disabled = true;
+
+      try {
+        const formData = new FormData();
+        formData.append('pdf', pdfFile);
+        formData.append('audio', audioFile);
+        formData.append('markers', JSON.stringify(markers));
+
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || '動画の生成に失敗しました');
+        }
+
+        // Complete the progress animation
+        completeProgress();
+
+        // Download the video
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'slidecast-output.mp4';
+        a.click();
+        URL.revokeObjectURL(url);
+
+        // Wait a moment to show completion
+        setTimeout(() => {
+          hideLoadingModal();
+          alert('動画の生成が完了しました！');
+        }, 1000);
+      } catch (error) {
+        hideLoadingModal();
+        alert('エラー: ' + error.message);
+      } finally {
+        generateBtn.disabled = false;
       }
     });
   </script>

@@ -12,5 +12,10 @@
   "devDependencies": {
     "@playwright/test": "^1.57.0",
     "pdfkit": "^0.17.2"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "multer": "^2.0.2"
   }
 }
