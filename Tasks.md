@@ -8,6 +8,26 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 
 ---
 
+## Git / PR 情報
+
+| 項目 | 値 |
+|------|-----|
+| 現在のブランチ | `task/T-020-slide-sync-editor` |
+| PR | [#2 T-020: Slide Sync Editor完成 - 動画生成・AI支援機能搭載](https://github.com/imzxelo/slidecast-pipeline/pull/2) |
+| PR状態 | ✅ **MERGED** |
+| 最新コミット | `39ef366` fix: Gemini/OpenAI API呼び出しを修正 |
+
+### 最近のコミット履歴
+```
+39ef366 fix: Gemini/OpenAI API呼び出しを修正
+33cbbe3 docs: 引き継ぎドキュメント（HANDOVER.md）を追加
+fca6bb2 docs: Tasks.mdを包括的に更新 - バグ追跡・変更履歴・将来計画を集約
+b498463 feat: マーカーUX改善 + Gemini 3.0 Flash PDF分析機能を追加
+2d6014e fix: マーカー追加後に自動で次のスライドへ進む + サムネイル表示
+```
+
+---
+
 ## 現在の進行状況
 
 | Phase | 内容 | 状態 |
@@ -49,6 +69,25 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 ---
 
 ## 完了した変更履歴
+
+### 2026-01-10: API バグ修正
+
+#### 修正内容
+- [x] **BUG-001: Gemini API修正**
+  - 原因: `config.thinkingConfig.thinkingBudget` に無効な値 `"minimal"` を渡していた
+  - 修正: `thinkingConfig` を削除、モデルを `gemini-2.0-flash` に変更
+  - コミット: `39ef366`
+
+- [x] **BUG-003: OpenAI API修正**
+  - 原因: Responses APIのレスポンス取得方法が間違っていた
+  - 修正: `data.output_text` → `data.output[0].content[0].text`
+  - コミット: `39ef366`
+
+- [x] **BUG-002: 動画保存問題調査**
+  - 結果: サーバー側の動画生成APIは正常動作（再現不可）
+  - curlテストでMP4ファイル正常生成を確認
+
+---
 
 ### 2026-01-09: Phase 3 拡張 + AI統合
 
@@ -176,7 +215,7 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 - [x] 概要欄生成（OpenAI GPT-5.2）
 - [x] キーポイント抽出
 - [x] クイズ生成
-- [x] PDF分析（Gemini 3.0 Flash）※要修正
+- [x] PDF分析（Gemini 2.0 Flash）✅ 修正済み
 - [x] アニメーション/AIパネル切り替え
 
 ### UX改善
@@ -270,8 +309,8 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 - dotenv（環境変数）
 
 ### 外部API
-- OpenAI GPT-5.2 Responses API（AI生成）
-- Gemini 3.0 Flash（PDF分析）※要修正
+- OpenAI GPT-5.2 Responses API（AI生成）✅
+- Gemini 2.0 Flash（PDF分析）✅
 
 ### ツール
 - ffmpeg/ffprobe（動画生成）
