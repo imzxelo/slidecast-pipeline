@@ -10,6 +10,7 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "pdfkit": "^0.17.2"
   }
 }
