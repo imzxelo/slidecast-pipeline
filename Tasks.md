@@ -12,18 +12,22 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 
 | 項目 | 値 |
 |------|-----|
-| 現在のブランチ | `task/T-020-slide-sync-editor` |
-| PR | [#2 T-020: Slide Sync Editor完成 - 動画生成・AI支援機能搭載](https://github.com/imzxelo/slidecast-pipeline/pull/2) |
-| PR状態 | ✅ **MERGED** |
-| 最新コミット | `4670a75` fix: Gemini 3.0 Flash (gemini-3-flash-preview) を使用するよう修正 |
+| 現在のブランチ | `task/T-021-api-bugfix` |
+| PR | [#3 T-021: API バグ修正（Gemini/OpenAI）](https://github.com/imzxelo/slidecast-pipeline/pull/3) |
+| PR状態 | ⏳ **OPEN** |
 
-### 最近のコミット履歴
+### PR履歴
+| PR | タイトル | 状態 |
+|----|----------|------|
+| [#2](https://github.com/imzxelo/slidecast-pipeline/pull/2) | T-020: Slide Sync Editor完成 | ✅ MERGED |
+| [#3](https://github.com/imzxelo/slidecast-pipeline/pull/3) | T-021: API バグ修正（Gemini/OpenAI） | ⏳ OPEN |
+
+### 最近のコミット履歴（task/T-021-api-bugfix）
 ```
-4670a75 fix: Gemini 3.0 Flash (gemini-3-flash-preview) を使用するよう修正
-4408296 docs: Tasks.mdにGit/PR情報と変更履歴を追加
-39ef366 fix: Gemini/OpenAI API呼び出しを修正
-33cbbe3 docs: 引き継ぎドキュメント（HANDOVER.md）を追加
-fca6bb2 docs: Tasks.mdを包括的に更新 - バグ追跡・変更履歴・将来計画を集約
+73d98e1 docs: Tasks.mdのコミット履歴を更新
+4159f03 fix: Gemini 3.0 Flash (gemini-3-flash-preview) を使用するよう修正
+fb09393 docs: Tasks.mdにGit/PR情報と変更履歴を追加
+c52f445 fix: Gemini/OpenAI API呼び出しを修正
 ```
 
 ---
