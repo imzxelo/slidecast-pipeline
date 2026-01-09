@@ -12,20 +12,20 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 
 | 項目 | 値 |
 |------|-----|
-| 現在のブランチ | `task/T-022-cli-improvements` |
-| PR | [#4 T-022: CLI 使い勝手向上 - 進捗表示追加](https://github.com/imzxelo/slidecast-pipeline/pull/4) |
-| PR状態 | ⏳ **OPEN** |
+| 現在のブランチ | `task/T-023-ai-auto-markers` |
+| PR | 作成予定 |
+| PR状態 | ⏳ **開発中** |
 
 ### PR履歴
 | PR | タイトル | 状態 |
 |----|----------|------|
 | [#2](https://github.com/imzxelo/slidecast-pipeline/pull/2) | T-020: Slide Sync Editor完成 | ✅ MERGED |
 | [#3](https://github.com/imzxelo/slidecast-pipeline/pull/3) | T-021: API バグ修正（Gemini/OpenAI） | ✅ MERGED |
-| [#4](https://github.com/imzxelo/slidecast-pipeline/pull/4) | T-022: CLI 使い勝手向上 - 進捗表示追加 | ⏳ OPEN |
+| [#4](https://github.com/imzxelo/slidecast-pipeline/pull/4) | T-022: CLI 使い勝手向上 - 進捗表示追加 | ✅ MERGED |
 
-### 最近のコミット履歴（task/T-022-cli-improvements）
+### 最近のコミット履歴（task/T-023-ai-auto-markers）
 ```
-0f3bff4 feat: CLI進捗表示を追加 (Phase 5)
+（開発中）
 ```
 
 ---
@@ -40,7 +40,7 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 | 3 | Slide Sync Editor（ローカルWeb） | ✅ Done |
 | 4 | README整備 | ✅ Done |
 | 5 | 使い勝手向上 | ✅ Done |
-| 6 | AI自動マーカー生成 | ⏳ Todo |
+| 6 | AI自動マーカー生成 | 🔄 In Progress |
 
 ---
 
@@ -254,26 +254,28 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 
 ---
 
-## Phase 6: AI自動マーカー生成 ⏳（新規）
+## Phase 6: AI自動マーカー生成 🔄（進行中）
 
 ### 6-1. PDF内容分析
-- [ ] Gemini 3.0 Flash でスライド画像を読み取り
-- [ ] 各スライドの内容を要約してキャッシュ
-- [ ] `/api/ai/analyze` エンドポイントの修正
+- [x] Gemini 3.0 Flash でスライド画像を読み取り（既存）
+- [x] 各スライドの内容を要約してキャッシュ（既存）
+- [x] `/api/ai/analyze` エンドポイント（既存）
 
 ### 6-2. 音声文字起こし
-- [ ] Whisper API または Google Speech-to-Text で音声をテキスト化
-- [ ] タイムスタンプ付きのトランスクリプト生成
+- [x] Whisper API で音声をテキスト化
+- [x] タイムスタンプ付きのトランスクリプト生成
+- [x] `/api/ai/transcribe` エンドポイント追加
 
 ### 6-3. 自動マーカー生成
-- [ ] AIがスライド内容と音声テキストをマッチング
-- [ ] 適切なタイミングでマーカーを自動配置
-- [ ] ユーザーが手動で調整可能
+- [x] AIがスライド内容と音声テキストをマッチング（GPT-5.2）
+- [x] 適切なタイミングでマーカーを自動配置
+- [x] `/api/ai/auto-markers` エンドポイント追加
 
 ### 6-4. UI統合
-- [ ] 「自動マーカー生成」ボタンを追加
-- [ ] 生成されたマーカーをプレビュー
-- [ ] 確定前に編集可能
+- [x] 「AI自動マーカー生成」セクションを追加
+- [x] PDF分析ボタン + 音声文字起こしボタン
+- [x] 生成されたマーカーをプレビュー（confirm表示）
+- [x] 確定前に編集可能（confirm後に適用）
 
 **DoD**: PDFと音声をアップロードすると、AIが自動でマーカーを提案する
 

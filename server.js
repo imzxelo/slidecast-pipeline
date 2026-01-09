@@ -494,6 +494,175 @@ app.get('/api/ai/summaries', (req, res) => {
   res.json({ summaries: slideSummariesCache });
 });
 
+// 音声文字起こしキャッシュ
+let transcriptCache = null;
+
+// 音声文字起こし（OpenAI Whisper API）
+app.post('/api/ai/transcribe', upload.single('audio'), async (req, res) => {
+  try {
+    const audioFile = req.file;
+    if (!audioFile) {
+      return res.status(400).json({ error: 'Audio file is required' });
+    }
+
+    if (!OPENAI_API_KEY) {
+      fs.unlinkSync(audioFile.path);
+      return res.status(400).json({ error: 'OPENAI_API_KEY is not set' });
+    }
+
+    // Whisper APIにファイルを送信
+    const formData = new FormData();
+    const audioBuffer = fs.readFileSync(audioFile.path);
+    const audioBlob = new Blob([audioBuffer], { type: 'audio/mpeg' });
+    formData.append('file', audioBlob, audioFile.originalname);
+    formData.append('model', 'whisper-1');
+    formData.append('response_format', 'verbose_json');
+    formData.append('timestamp_granularities[]', 'segment');
+    formData.append('language', 'ja');
+
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'Whisper API error');
+    }
+
+    const data = await response.json();
+
+    // セグメント情報を整形
+    const segments = (data.segments || []).map(seg => ({
+      start: seg.start,
+      end: seg.end,
+      text: seg.text.trim()
+    }));
+
+    // キャッシュに保存
+    transcriptCache = {
+      text: data.text,
+      segments: segments,
+      duration: data.duration
+    };
+
+    // Cleanup
+    fs.unlinkSync(audioFile.path);
+
+    res.json({
+      success: true,
+      text: data.text,
+      segments: segments,
+      duration: data.duration
+    });
+  } catch (error) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    console.error('Transcribe error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// キャッシュされた文字起こしを取得
+app.get('/api/ai/transcript', (req, res) => {
+  if (!transcriptCache) {
+    return res.status(404).json({ error: 'No transcript available. Transcribe audio first.' });
+  }
+  res.json(transcriptCache);
+});
+
+// 自動マーカー生成（GPT-5.2でスライドと音声をマッチング）
+app.post('/api/ai/auto-markers', async (req, res) => {
+  try {
+    if (!OPENAI_API_KEY) {
+      return res.status(400).json({ error: 'OPENAI_API_KEY is not set' });
+    }
+
+    if (!slideSummariesCache || slideSummariesCache.length === 0) {
+      return res.status(400).json({ error: 'PDFを先に分析してください（PDF分析ボタン）' });
+    }
+
+    if (!transcriptCache || !transcriptCache.segments || transcriptCache.segments.length === 0) {
+      return res.status(400).json({ error: '音声を先に文字起こししてください（文字起こしボタン）' });
+    }
+
+    // スライド要約を整形
+    const slideSummaries = slideSummariesCache.map(s =>
+      `スライド${s.slide}: ${s.summary}`
+    ).join('\n');
+
+    // 音声セグメントを整形
+    const audioSegments = transcriptCache.segments.map(seg =>
+      `[${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s] ${seg.text}`
+    ).join('\n');
+
+    const prompt = `あなたはプレゼンテーションの音声とスライドを同期させるエキスパートです。
+
+以下の情報をもとに、各スライドが表示されるべき最適なタイミング（秒）を提案してください。
+
+【スライド内容】
+${slideSummaries}
+
+【音声文字起こし（タイムスタンプ付き）】
+${audioSegments}
+
+以下の形式で、各スライドの開始タイミングをJSON形式で出力してください：
+{"markers": [{"t": 0, "slide": 1}, {"t": 15.5, "slide": 2}, ...]}
+
+ルール：
+1. 最初のマーカーは必ず t=0 から始める
+2. スライドの内容に対応する音声が始まるタイミングでマーカーを配置
+3. すべてのスライドに対してマーカーを生成
+4. 音声の内容とスライドの内容が一致するポイントを見つける
+5. JSON形式のみを出力（説明文は不要）`;
+
+    const content = await callOpenAI(prompt);
+
+    // JSON部分を抽出
+    let markersData;
+    try {
+      // JSONブロックを抽出
+      const jsonMatch = content.match(/\{[\s\S]*"markers"[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('マーカーデータが見つかりません');
+      }
+      markersData = JSON.parse(jsonMatch[0]);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError, 'Content:', content);
+      return res.status(500).json({ error: 'AIの出力をパースできませんでした。もう一度お試しください。' });
+    }
+
+    if (!markersData.markers || !Array.isArray(markersData.markers)) {
+      return res.status(500).json({ error: '無効なマーカーデータです' });
+    }
+
+    // マーカーを検証・整形
+    const markers = markersData.markers
+      .filter(m => typeof m.t === 'number' && typeof m.slide === 'number')
+      .map(m => ({
+        t: Math.max(0, m.t),
+        slide: Math.max(1, Math.round(m.slide))
+      }))
+      .sort((a, b) => a.t - b.t);
+
+    // 最初のマーカーがt=0でない場合は追加
+    if (markers.length === 0 || markers[0].t > 0.1) {
+      markers.unshift({ t: 0, slide: 1 });
+    }
+
+    res.json({
+      success: true,
+      markers: markers,
+      slideCount: slideSummariesCache.length
+    });
+  } catch (error) {
+    console.error('Auto markers error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Slide Sync Editor running at http://localhost:${PORT}`);
 
