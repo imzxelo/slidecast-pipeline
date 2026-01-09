@@ -74,9 +74,9 @@ b498463 feat: マーカーUX改善 + Gemini 3.0 Flash PDF分析機能を追加
 
 #### 修正内容
 - [x] **BUG-001: Gemini API修正**
-  - 原因: `config.thinkingConfig.thinkingBudget` に無効な値 `"minimal"` を渡していた
-  - 修正: `thinkingConfig` を削除、モデルを `gemini-2.0-flash` に変更
-  - コミット: `39ef366`
+  - 原因: `config.thinkingConfig.thinkingBudget` に無効な値 `"minimal"`（文字列）を渡していた
+  - 修正: `thinkingBudget: 0`（整数）に変更、モデルは `gemini-3-flash-preview` を維持
+  - コミット: `39ef366`, 追加修正あり
 
 - [x] **BUG-003: OpenAI API修正**
   - 原因: Responses APIのレスポンス取得方法が間違っていた
@@ -215,7 +215,7 @@ b498463 feat: マーカーUX改善 + Gemini 3.0 Flash PDF分析機能を追加
 - [x] 概要欄生成（OpenAI GPT-5.2）
 - [x] キーポイント抽出
 - [x] クイズ生成
-- [x] PDF分析（Gemini 2.0 Flash）✅ 修正済み
+- [x] PDF分析（Gemini 3.0 Flash）✅ 修正済み
 - [x] アニメーション/AIパネル切り替え
 
 ### UX改善
@@ -310,7 +310,7 @@ b498463 feat: マーカーUX改善 + Gemini 3.0 Flash PDF分析機能を追加
 
 ### 外部API
 - OpenAI GPT-5.2 Responses API（AI生成）✅
-- Gemini 2.0 Flash（PDF分析）✅
+- Gemini 3.0 Flash (gemini-3-flash-preview)（PDF分析）✅
 
 ### ツール
 - ffmpeg/ffprobe（動画生成）
