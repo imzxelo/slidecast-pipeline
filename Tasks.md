@@ -15,15 +15,15 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 | 現在のブランチ | `task/T-020-slide-sync-editor` |
 | PR | [#2 T-020: Slide Sync Editor完成 - 動画生成・AI支援機能搭載](https://github.com/imzxelo/slidecast-pipeline/pull/2) |
 | PR状態 | ✅ **MERGED** |
-| 最新コミット | `39ef366` fix: Gemini/OpenAI API呼び出しを修正 |
+| 最新コミット | `4670a75` fix: Gemini 3.0 Flash (gemini-3-flash-preview) を使用するよう修正 |
 
 ### 最近のコミット履歴
 ```
+4670a75 fix: Gemini 3.0 Flash (gemini-3-flash-preview) を使用するよう修正
+4408296 docs: Tasks.mdにGit/PR情報と変更履歴を追加
 39ef366 fix: Gemini/OpenAI API呼び出しを修正
 33cbbe3 docs: 引き継ぎドキュメント（HANDOVER.md）を追加
 fca6bb2 docs: Tasks.mdを包括的に更新 - バグ追跡・変更履歴・将来計画を集約
-b498463 feat: マーカーUX改善 + Gemini 3.0 Flash PDF分析機能を追加
-2d6014e fix: マーカー追加後に自動で次のスライドへ進む + サムネイル表示
 ```
 
 ---
