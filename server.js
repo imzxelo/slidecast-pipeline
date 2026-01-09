@@ -278,7 +278,7 @@ async function summarizeSlides(pdfPath) {
       const base64Image = imageData.toString('base64');
 
       const response = await geminiClient.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-3-flash-preview',
         contents: [{
           parts: [
             {
@@ -291,7 +291,10 @@ async function summarizeSlides(pdfPath) {
               text: 'このスライドの内容を日本語で簡潔に要約してください。箇条書きで主要なポイントを3つ以内で挙げてください。'
             }
           ]
-        }]
+        }],
+        config: {
+          thinkingConfig: { thinkingBudget: 0 }
+        }
       });
 
       summaries.push({
@@ -505,6 +508,6 @@ app.listen(PORT, () => {
   if (!GEMINI_API_KEY) {
     console.log('Note: GEMINI_API_KEY is not set. PDF analysis features will not work.');
   } else {
-    console.log('Gemini 2.0 Flash: enabled');
+    console.log('Gemini 3.0 Flash (gemini-3-flash-preview): enabled');
   }
 });
