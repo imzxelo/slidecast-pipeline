@@ -17,6 +17,8 @@
     "@google/genai": "^1.35.0",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
-    "multer": "^2.0.2"
+    "form-data": "^4.0.5",
+    "multer": "^2.0.2",
+    "openai": "^6.15.0"
   }
 }

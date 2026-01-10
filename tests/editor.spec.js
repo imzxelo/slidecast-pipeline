@@ -56,7 +56,7 @@ test.describe('Slide Sync Editor', () => {
 
     // Add marker button
     await expect(page.locator('#addMarkerBtn')).toBeVisible();
-    await expect(page.locator('#addMarkerBtn')).toHaveText('＋ マーカーを追加');
+    await expect(page.locator('#addMarkerBtn')).toHaveText('＋ マーカーを追加（手動）');
 
     // Empty state message
     await expect(page.locator('.markers-list .empty-state')).toBeVisible();
@@ -128,5 +128,23 @@ test.describe('Slide Sync Editor', () => {
 
     const modal = page.locator('#editModal');
     await expect(modal).not.toHaveClass(/active/);
+  });
+
+  test('should have auto marker generation section', async ({ page }) => {
+    await page.goto(editorPath);
+
+    // Auto marker section
+    await expect(page.locator('.auto-marker-section')).toBeVisible();
+    await expect(page.locator('.auto-marker-title')).toContainText('AI自動マーカー生成');
+
+    // Step buttons
+    await expect(page.locator('#analyzePdfBtn')).toBeVisible();
+    await expect(page.locator('#analyzePdfBtn')).toContainText('PDF分析');
+    await expect(page.locator('#transcribeBtn')).toBeVisible();
+    await expect(page.locator('#transcribeBtn')).toContainText('音声文字起こし');
+
+    // Auto generate button (disabled by default)
+    await expect(page.locator('#autoGenerateBtn')).toBeVisible();
+    await expect(page.locator('#autoGenerateBtn')).toBeDisabled();
   });
 });

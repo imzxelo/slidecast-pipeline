@@ -375,23 +375,237 @@
       background: #fdf2f2;
       border-color: #f5c6cb;
     }
-    .add-marker-btn {
-      margin: 16px 16px 8px 16px;
-      padding: 14px;
-      background: linear-gradient(135deg, #c9a227 0%, #d4b03a 100%);
+    /* 手動マーカー追加ボタン（小さめ） */
+    .add-marker-btn-small {
+      margin: 8px 16px;
+      padding: 10px;
+      background: #f8f6f3;
+      color: #666;
+      border: 1px dashed #ccc;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .add-marker-btn-small:hover {
+      background: #f0ece7;
+      border-color: #999;
+      color: #333;
+    }
+    /* AI自動生成セクション（目立つ位置） */
+    .auto-generate-section {
+      margin: 16px;
+      padding: 16px;
+      background: linear-gradient(135deg, #1e3a5f 0%, #2d5a8f 100%);
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(30, 58, 95, 0.3);
+    }
+    .auto-generate-btn-main {
+      width: 100%;
+      padding: 16px 20px;
+      background: linear-gradient(135deg, #c9a227 0%, #e0b82e 100%);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(201, 162, 39, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .auto-generate-btn-main:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(201, 162, 39, 0.5);
+    }
+    .auto-generate-btn-main:disabled {
+      background: #6b7c8f;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .auto-generate-btn-main .btn-icon {
+      font-size: 18px;
+    }
+    .auto-generate-btn-main.loading {
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .auto-status {
+      margin-top: 10px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.8);
+      text-align: center;
+    }
+    .auto-status.ready {
+      color: #90EE90;
+    }
+    .auto-status.error {
+      color: #ff8080;
+    }
+    .auto-progress {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .progress-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.9);
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      transition: all 0.3s;
+    }
+    .progress-item.waiting {
+      opacity: 0.5;
+    }
+    .progress-item.processing {
+      background: rgba(255, 200, 50, 0.2);
+      animation: processingPulse 1.5s infinite;
+    }
+    @keyframes processingPulse {
+      0%, 100% { background: rgba(255, 200, 50, 0.2); }
+      50% { background: rgba(255, 200, 50, 0.35); }
+    }
+    .progress-item.done {
+      color: #90EE90;
+      background: rgba(144, 238, 144, 0.15);
+      opacity: 1;
+    }
+    .progress-item.error {
+      color: #ff8080;
+      background: rgba(255, 128, 128, 0.15);
+      opacity: 1;
+    }
+    .progress-icon {
+      font-size: 16px;
+    }
+    .progress-text {
+      flex: 1;
+    }
+    /* 旧スタイル互換 */
+    .step-number {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #d0e3f7;
+      color: #1e3a5f;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .step-number.done {
+      background: #4ade80;
+      color: #fff;
+    }
+    .step-btn {
+      flex: 1;
+      padding: 10px 12px;
+      background: #fff;
+      border: 1px solid #d0e3f7;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #1e3a5f;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+    }
+    .step-btn:hover:not(:disabled) {
+      border-color: #1e3a5f;
+      background: #f8fafd;
+    }
+    .step-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .step-btn.done {
+      background: #f0fdf4;
+      border-color: #4ade80;
+      color: #166534;
+    }
+    .step-btn.loading {
+      position: relative;
+      color: transparent;
+    }
+    .step-btn.loading::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 16px;
+      height: 16px;
+      margin: -8px 0 0 -8px;
+      border: 2px solid #d0e3f7;
+      border-top-color: #1e3a5f;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .auto-generate-btn {
+      margin-top: 12px;
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
       color: #fff;
       border: none;
       border-radius: 6px;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
-      box-shadow: 0 4px 12px rgba(201, 162, 39, 0.3);
-      letter-spacing: 0.5px;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
     }
-    .add-marker-btn:hover {
+    .auto-generate-btn:hover:not(:disabled) {
       transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(201, 162, 39, 0.4);
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+    }
+    .auto-generate-btn:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .auto-generate-btn.loading {
+      position: relative;
+      color: transparent;
+    }
+    .auto-generate-btn.loading::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 18px;
+      height: 18px;
+      margin: -9px 0 0 -9px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .auto-marker-status {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #6b7280;
+      text-align: center;
+    }
+    .auto-marker-status.success {
+      color: #166534;
+    }
+    .auto-marker-status.error {
+      color: #dc2626;
     }
     .generate-btn {
       margin: 8px 16px 16px 16px;
@@ -860,13 +1074,32 @@
           <button id="exportBtn" class="primary">保存</button>
         </div>
       </div>
+      <!-- AI自動生成ボタン（目立つ位置に配置） -->
+      <div class="auto-generate-section">
+        <button class="auto-generate-btn-main" id="autoGenerateBtn" disabled>
+          <span class="btn-icon">✨</span>
+          マーカーを自動生成（AI）
+        </button>
+        <div class="auto-status" id="autoMarkerStatus">📂 PDFと音声ファイルを選択してください</div>
+        <div class="auto-progress" id="autoProgress">
+          <div class="progress-item waiting" id="pdfProgress">
+            <span class="progress-icon" id="pdfProgressIcon">📄</span>
+            <span class="progress-text" id="pdfProgressText">PDFを待機中...</span>
+          </div>
+          <div class="progress-item waiting" id="audioProgress">
+            <span class="progress-icon" id="audioProgressIcon">🎵</span>
+            <span class="progress-text" id="audioProgressText">音声を待機中...</span>
+          </div>
+        </div>
+      </div>
+
       <div class="markers-list" id="markersList">
         <div class="empty-state">
           <p>マーカーがありません</p>
-          <p>Mキーでマーカーを追加できます</p>
+          <p>上のボタンで自動生成するか、Mキーで手動追加</p>
         </div>
       </div>
-      <button class="add-marker-btn" id="addMarkerBtn">＋ マーカーを追加</button>
+      <button class="add-marker-btn-small" id="addMarkerBtn">＋ 手動でマーカーを追加</button>
       <button class="generate-btn" id="generateBtn">動画を生成</button>
       <div class="keyboard-hint">
         <kbd>Space</kbd> 再生/停止
@@ -990,6 +1223,9 @@
 
       renderThumbnails();
       renderPage(1);
+
+      // 🔄 自動でPDF分析を開始
+      autoAnalyzePdf();
     });
 
     // Render thumbnails
@@ -1060,6 +1296,9 @@
       audioFile = file;
       audioName.textContent = file.name;
       audioPlayer.src = URL.createObjectURL(file);
+
+      // 🔄 自動で音声文字起こしを開始
+      autoTranscribeAudio();
     });
 
     // Audio events
@@ -1565,6 +1804,195 @@
       });
     });
 
+    // Auto Marker Generation (自動処理版)
+    const autoGenerateBtn = document.getElementById('autoGenerateBtn');
+    const autoMarkerStatus = document.getElementById('autoMarkerStatus');
+    const autoProgress = document.getElementById('autoProgress');
+    const pdfProgress = document.getElementById('pdfProgress');
+    const audioProgress = document.getElementById('audioProgress');
+    const pdfProgressIcon = document.getElementById('pdfProgressIcon');
+    const audioProgressIcon = document.getElementById('audioProgressIcon');
+    const pdfProgressText = document.getElementById('pdfProgressText');
+    const audioProgressText = document.getElementById('audioProgressText');
+
+    let pdfAnalyzedForAuto = false;
+    let audioTranscribed = false;
+    let pdfAnalyzing = false;
+    let audioTranscribing = false;
+
+    // Update auto generate button state
+    function updateAutoGenerateState() {
+      const ready = pdfAnalyzedForAuto && audioTranscribed;
+      const processing = pdfAnalyzing || audioTranscribing;
+
+      autoGenerateBtn.disabled = !ready || processing;
+
+      // メインステータスメッセージを更新
+      if (ready && !processing) {
+        autoMarkerStatus.textContent = '✅ 準備完了！下のボタンをクリックしてマーカーを自動生成';
+        autoMarkerStatus.className = 'auto-status ready';
+      } else if (processing) {
+        if (pdfAnalyzing && audioTranscribing) {
+          autoMarkerStatus.textContent = '🔄 PDFと音声を同時にAI分析中...';
+        } else if (pdfAnalyzing) {
+          autoMarkerStatus.textContent = '🔄 PDFをAI分析中... 音声も選択してください';
+        } else if (audioTranscribing) {
+          autoMarkerStatus.textContent = '🔄 音声を文字起こし中... しばらくお待ちください';
+        }
+        autoMarkerStatus.className = 'auto-status';
+      } else if (pdfAnalyzedForAuto && !audioTranscribed) {
+        autoMarkerStatus.textContent = '📂 PDF分析完了！音声ファイルを選択してください';
+        autoMarkerStatus.className = 'auto-status';
+      } else if (!pdfAnalyzedForAuto && audioTranscribed) {
+        autoMarkerStatus.textContent = '📂 音声分析完了！PDFファイルを選択してください';
+        autoMarkerStatus.className = 'auto-status';
+      } else {
+        autoMarkerStatus.textContent = '📂 PDFと音声ファイルを選択してください';
+        autoMarkerStatus.className = 'auto-status';
+      }
+    }
+
+    // 自動PDF分析（PDF読み込み時に自動実行）
+    async function autoAnalyzePdf() {
+      if (!pdfFile || pdfAnalyzing || pdfAnalyzedForAuto) return;
+
+      pdfAnalyzing = true;
+      pdfProgress.className = 'progress-item processing';
+      pdfProgressIcon.textContent = '⏳';
+      pdfProgressText.textContent = 'PDF分析中...（Gemini AI）';
+      updateAutoGenerateState();
+
+      try {
+        const formData = new FormData();
+        formData.append('pdf', pdfFile);
+
+        const response = await fetch('/api/ai/analyze', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'PDF分析に失敗しました');
+        }
+
+        const data = await response.json();
+        pdfAnalyzedForAuto = true;
+        pdfAnalyzed = true;
+        pdfProgress.className = 'progress-item done';
+        pdfProgressIcon.textContent = '✅';
+        pdfProgressText.textContent = `PDF分析完了（${data.slideCount}枚のスライド）`;
+
+        // AI panel state update
+        if (aiAnalyzeBtn) {
+          aiAnalyzeBtn.classList.add('done');
+          aiAnalyzeBtn.textContent = '分析完了 ✓';
+        }
+        if (aiStatus) {
+          aiStatus.textContent = `${data.slideCount}枚のスライドを分析しました`;
+          aiStatus.classList.add('analyzed');
+        }
+
+      } catch (error) {
+        pdfProgress.className = 'progress-item error';
+        pdfProgressIcon.textContent = '❌';
+        pdfProgressText.textContent = `エラー: ${error.message}`;
+      } finally {
+        pdfAnalyzing = false;
+        updateAutoGenerateState();
+      }
+    }
+
+    // 自動音声文字起こし（音声読み込み時に自動実行）
+    async function autoTranscribeAudio() {
+      if (!audioFile || audioTranscribing || audioTranscribed) return;
+
+      audioTranscribing = true;
+      audioProgress.className = 'progress-item processing';
+      audioProgressIcon.textContent = '⏳';
+      audioProgressText.textContent = '音声文字起こし中...（Whisper AI）';
+      updateAutoGenerateState();
+
+      try {
+        const formData = new FormData();
+        formData.append('audio', audioFile);
+
+        const response = await fetch('/api/ai/transcribe', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || '文字起こしに失敗しました');
+        }
+
+        const data = await response.json();
+        audioTranscribed = true;
+        audioProgress.className = 'progress-item done';
+        audioProgressIcon.textContent = '✅';
+        audioProgressText.textContent = `音声文字起こし完了（${Math.round(data.duration)}秒の音声）`;
+
+      } catch (error) {
+        audioProgress.className = 'progress-item error';
+        audioProgressIcon.textContent = '❌';
+        audioProgressText.textContent = `エラー: ${error.message}`;
+      } finally {
+        audioTranscribing = false;
+        updateAutoGenerateState();
+      }
+    }
+
+    // Auto Generate Markers
+    autoGenerateBtn.addEventListener('click', async () => {
+      if (!pdfAnalyzedForAuto || !audioTranscribed) {
+        autoMarkerStatus.textContent = '⏳ PDFと音声の分析完了を待っています...';
+        return;
+      }
+
+      autoGenerateBtn.disabled = true;
+      autoGenerateBtn.classList.add('loading');
+      autoMarkerStatus.innerHTML = '🤖 <strong>AIがスライドと音声をマッチング中...</strong><br><small>GPT-5.2がタイミングを分析しています。しばらくお待ちください。</small>';
+      autoMarkerStatus.className = 'auto-status';
+
+      try {
+        const response = await fetch('/api/ai/auto-markers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'マーカー生成に失敗しました');
+        }
+
+        const data = await response.json();
+
+        // マーカーを時間順にソート
+        const sortedMarkers = [...data.markers].sort((a, b) => a.t - b.t);
+
+        // 直接マーカーを適用（確認ダイアログなし）
+        markers = sortedMarkers;
+        renderMarkers();
+        renderMarkerIndicators();
+
+        // 成功メッセージを表示
+        autoMarkerStatus.innerHTML = `🎉 <strong>${sortedMarkers.length}個のマーカーを自動生成しました！</strong><br><small>下のリストで確認・編集できます</small>`;
+        autoMarkerStatus.className = 'auto-status ready';
+
+        // 簡単な通知
+        alert(`✅ ${sortedMarkers.length}個のマーカーを自動生成しました！\n\n下のマーカーリストで確認できます。`);
+
+      } catch (error) {
+        autoMarkerStatus.innerHTML = `❌ <strong>エラー:</strong> ${error.message}<br><small>もう一度お試しください</small>`;
+        autoMarkerStatus.className = 'auto-status error';
+      } finally {
+        autoGenerateBtn.disabled = false;
+        autoGenerateBtn.classList.remove('loading');
+        updateAutoGenerateState();
+      }
+    });
+
     // Generate video
     generateBtn.addEventListener('click', async () => {
       if (!pdfFile || !audioFile) {
@@ -1583,32 +2011,39 @@
         formData.append('audio', audioFile);
         formData.append('markers', JSON.stringify(markers));
 
+        // 長時間の動画生成に対応するため、10分のタイムアウトを設定
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10分
+
         const response = await fetch('/api/generate', {
           method: 'POST',
           body: formData,
+          signal: controller.signal,
         });
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || '動画の生成に失敗しました');
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || '動画の生成に失敗しました');
         }
 
         // Complete the progress animation
         completeProgress();
 
-        // Download the video
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
+        // ダウンロードリンクから動画をダウンロード
         const a = document.createElement('a');
-        a.href = url;
-        a.download = 'slidecast-output.mp4';
+        a.href = data.downloadUrl;
+        a.download = data.filename || 'slidecast-output.mp4';
         a.click();
-        URL.revokeObjectURL(url);
+
+        const sizeMB = (data.size / 1024 / 1024).toFixed(1);
 
         // Wait a moment to show completion
         setTimeout(() => {
           hideLoadingModal();
-          alert('動画の生成が完了しました！');
+          alert(`動画の生成が完了しました！\nファイルサイズ: ${sizeMB}MB`);
         }, 1000);
       } catch (error) {
         hideLoadingModal();

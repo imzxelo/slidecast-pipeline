@@ -12,8 +12,8 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 
 | 項目 | 値 |
 |------|-----|
-| 現在のブランチ | `task/T-022-cli-improvements` |
-| PR | [#4 T-022: CLI 使い勝手向上 - 進捗表示追加](https://github.com/imzxelo/slidecast-pipeline/pull/4) |
+| 現在のブランチ | `task/T-023-ai-auto-markers` |
+| PR | [#5 T-023: AI自動マーカー生成機能](https://github.com/imzxelo/slidecast-pipeline/pull/5) |
 | PR状態 | ⏳ **OPEN** |
 
 ### PR履歴
@@ -21,11 +21,15 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 |----|----------|------|
 | [#2](https://github.com/imzxelo/slidecast-pipeline/pull/2) | T-020: Slide Sync Editor完成 | ✅ MERGED |
 | [#3](https://github.com/imzxelo/slidecast-pipeline/pull/3) | T-021: API バグ修正（Gemini/OpenAI） | ✅ MERGED |
-| [#4](https://github.com/imzxelo/slidecast-pipeline/pull/4) | T-022: CLI 使い勝手向上 - 進捗表示追加 | ⏳ OPEN |
+| [#4](https://github.com/imzxelo/slidecast-pipeline/pull/4) | T-022: CLI 使い勝手向上 - 進捗表示追加 | ✅ MERGED |
+| [#5](https://github.com/imzxelo/slidecast-pipeline/pull/5) | T-023: AI自動マーカー生成機能 (Phase 6) | ⏳ OPEN |
 
-### 最近のコミット履歴（task/T-022-cli-improvements）
+### 最近のコミット履歴（task/T-023-ai-auto-markers）
 ```
-0f3bff4 feat: CLI進捗表示を追加 (Phase 5)
+2b87e93 fix: 動画生成のタイムアウト問題を解決
+3ed8de0 docs: Tasks.mdにコミットハッシュdf828ffを追記
+df828ff feat: AI自動マーカー生成UX改善 + パフォーマンス最適化
+0bc9196 feat: AI自動マーカー生成機能を追加 (Phase 6)
 ```
 
 ---
@@ -40,7 +44,7 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 | 3 | Slide Sync Editor（ローカルWeb） | ✅ Done |
 | 4 | README整備 | ✅ Done |
 | 5 | 使い勝手向上 | ✅ Done |
-| 6 | AI自動マーカー生成 | ⏳ Todo |
+| 6 | AI自動マーカー生成 | ✅ Done |
 
 ---
 
@@ -67,6 +71,16 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
   - 正: `data.output[0].content[0].text`
 - **修正内容** (2026-01-10):
   - レスポンス取得を正しい形式に修正
+
+### BUG-004: 長時間動画生成でダウンロード失敗（EPIPE） ✅ 修正済み
+- **症状**: 18分の動画生成時、進捗100%になった後「Failed to fetch」エラー
+- **原因**: 動画生成に3-4分かかり、ブラウザの接続がタイムアウト（EPIPE = broken pipe）
+- **修正内容** (2026-01-10):
+  - ダウンロード方式を変更: ストリーミング → ファイル保存+ダウンロードリンク
+  - 生成した動画を`output/`フォルダに保存
+  - JSONでダウンロードURLを返す方式に変更
+  - サーバー/フロントエンドのタイムアウトを10分に延長
+  - コミット: `2b87e93`
 
 ---
 
@@ -254,28 +268,46 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 
 ---
 
-## Phase 6: AI自動マーカー生成 ⏳（新規）
+## Phase 6: AI自動マーカー生成 ✅ Done
 
 ### 6-1. PDF内容分析
-- [ ] Gemini 3.0 Flash でスライド画像を読み取り
-- [ ] 各スライドの内容を要約してキャッシュ
-- [ ] `/api/ai/analyze` エンドポイントの修正
+- [x] Gemini 3.0 Flash でスライド画像を読み取り（既存）
+- [x] 各スライドの内容を要約してキャッシュ（既存）
+- [x] `/api/ai/analyze` エンドポイント（既存）
+- [x] **並列処理で高速化**（15スライド: 5分→10秒）
 
 ### 6-2. 音声文字起こし
-- [ ] Whisper API または Google Speech-to-Text で音声をテキスト化
-- [ ] タイムスタンプ付きのトランスクリプト生成
+- [x] Whisper API で音声をテキスト化
+- [x] タイムスタンプ付きのトランスクリプト生成
+- [x] `/api/ai/transcribe` エンドポイント追加
+- [x] **25MB超の音声ファイルを自動圧縮**（ffmpeg使用）
+- [x] **OpenAI SDK使用でファイルアップロード修正**
 
 ### 6-3. 自動マーカー生成
-- [ ] AIがスライド内容と音声テキストをマッチング
-- [ ] 適切なタイミングでマーカーを自動配置
-- [ ] ユーザーが手動で調整可能
+- [x] AIがスライド内容と音声テキストをマッチング（GPT-5.2）
+- [x] 適切なタイミングでマーカーを自動配置
+- [x] `/api/ai/auto-markers` エンドポイント追加
+- [x] **マーカーを時間順にソート**
 
 ### 6-4. UI統合
-- [ ] 「自動マーカー生成」ボタンを追加
-- [ ] 生成されたマーカーをプレビュー
-- [ ] 確定前に編集可能
+- [x] 「AI自動マーカー生成」セクションを追加（目立つ位置に配置）
+- [x] **PDF/音声読み込み時に自動でAI分析開始**（ボタン不要）
+- [x] 進捗状況のリアルタイム表示（処理中/完了/エラー）
+- [x] マーカー生成結果を直接適用（確認ダイアログ削除）
 
-**DoD**: PDFと音声をアップロードすると、AIが自動でマーカーを提案する
+### 6-5. パフォーマンス最適化
+- [x] **動画生成高速化**（35分→数分: `-preset ultrafast`, `-tune stillimage`）
+- [x] PDF分析並列処理（30倍高速化）
+- [x] E2Eテスト追加（Playwright）
+
+### 6-6. 動画ダウンロード問題修正
+- [x] **長時間動画のタイムアウト問題を解決**（BUG-004）
+- [x] ダウンロード方式変更: ストリーミング → ファイル保存+ダウンロードリンク
+- [x] サーバー/フロントエンドのタイムアウトを10分に延長
+- [x] 動画生成の詳細ログを追加
+
+**DoD**: PDFと音声をアップロードすると、AIが自動でマーカーを提案する ✅
+**実機テスト**: 18分の実素材で動画生成成功（72.9MB）
 
 ---
 
