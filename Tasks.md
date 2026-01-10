@@ -26,7 +26,7 @@ Slide Sync Editorで `markers.json` を作成し、CLIへ渡せる。
 
 ### 最近のコミット履歴（task/T-023-ai-auto-markers）
 ```
-xxxxxxx feat: AI自動マーカー生成UX改善 + パフォーマンス最適化
+df828ff feat: AI自動マーカー生成UX改善 + パフォーマンス最適化
 0bc9196 feat: AI自動マーカー生成機能を追加 (Phase 6)
 ```
 
