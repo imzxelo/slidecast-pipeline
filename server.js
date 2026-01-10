@@ -158,15 +158,22 @@ function writeConcatFile(workdir, slides, durations) {
 
 function buildVideo(concatPath, workdir) {
   const videoPath = path.join(workdir, 'video.mp4');
+  // 最適化: スライドショー用に高速エンコード設定
+  // - framerate 1: 入力を1fpsとして扱う（静止画なので十分）
+  // - preset ultrafast: 最高速エンコード
+  // - tune stillimage: 静止画用最適化
+  // - crf 23: 標準品質（デフォルトより少し低いが十分）
   runOrThrow('ffmpeg', [
     '-y',
     '-f', 'concat',
     '-safe', '0',
     '-i', concatPath,
-    '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+    '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=1',
     '-pix_fmt', 'yuv420p',
-    '-r', '30',
     '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-tune', 'stillimage',
+    '-crf', '23',
     videoPath,
   ]);
   return videoPath;
@@ -270,10 +277,12 @@ async function summarizeSlides(pdfPath) {
     convertPdfToPng(pdfPath, workdir);
     const slides = listSlideImages(workdir);
 
-    const summaries = [];
+    console.log(`Processing ${slides.length} slides in parallel...`);
+    const startTime = Date.now();
 
-    for (let i = 0; i < slides.length; i++) {
-      const slidePath = path.join(workdir, slides[i]);
+    // 全スライドを並列処理（Gemini APIのレート制限に注意）
+    const summaryPromises = slides.map(async (slide, i) => {
+      const slidePath = path.join(workdir, slide);
       const imageData = fs.readFileSync(slidePath);
       const base64Image = imageData.toString('base64');
 
@@ -297,11 +306,18 @@ async function summarizeSlides(pdfPath) {
         }
       });
 
-      summaries.push({
+      return {
         slide: i + 1,
         summary: response.text || ''
-      });
-    }
+      };
+    });
+
+    const summaries = await Promise.all(summaryPromises);
+    // スライド番号順にソート
+    summaries.sort((a, b) => a.slide - b.slide);
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`Processed ${slides.length} slides in ${elapsed}s`);
 
     return summaries;
   } finally {
@@ -325,6 +341,7 @@ async function callOpenAI(prompt) {
     throw new Error('OPENAI_API_KEY is not set. Please add it to .env file.');
   }
 
+  console.log('Calling OpenAI Responses API...');
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
@@ -338,14 +355,40 @@ async function callOpenAI(prompt) {
     })
   });
 
+  console.log('OpenAI API response status:', response.status);
+
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'OpenAI API error');
+    const errorText = await response.text();
+    console.error('OpenAI API error response:', errorText);
+    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
+  console.log('OpenAI response status:', data.status);
+  console.log('OpenAI output array:', JSON.stringify(data.output, null, 2));
+
   // Responses API returns output in nested structure
-  return data.output?.[0]?.content?.[0]?.text || '';
+  // Try to find text in various possible locations
+  let result = '';
+  if (data.output && Array.isArray(data.output)) {
+    for (const outputItem of data.output) {
+      if (outputItem.content && Array.isArray(outputItem.content)) {
+        for (const contentItem of outputItem.content) {
+          if (contentItem.text) {
+            result += contentItem.text;
+          }
+        }
+      }
+      // Also check for direct text property
+      if (outputItem.text) {
+        result += outputItem.text;
+      }
+    }
+  }
+
+  console.log('Extracted text length:', result.length);
+  console.log('Extracted text preview:', result.substring(0, 200));
+  return result;
 }
 
 // Generate summary for video description
@@ -497,69 +540,124 @@ app.get('/api/ai/summaries', (req, res) => {
 // 音声文字起こしキャッシュ
 let transcriptCache = null;
 
+// 音声ファイルを圧縮（ffmpegを使用）
+function compressAudio(inputPath, outputPath) {
+  // 64kbps mono MP3に圧縮（Whisper APIは音声認識なので十分な品質）
+  runOrThrow('ffmpeg', [
+    '-y',
+    '-i', inputPath,
+    '-b:a', '64k',
+    '-ac', '1',
+    outputPath
+  ]);
+}
+
 // 音声文字起こし（OpenAI Whisper API）
 app.post('/api/ai/transcribe', upload.single('audio'), async (req, res) => {
+  let tempFiles = []; // クリーンアップ用
+
   try {
     const audioFile = req.file;
     if (!audioFile) {
       return res.status(400).json({ error: 'Audio file is required' });
     }
+    tempFiles.push(audioFile.path);
 
     if (!OPENAI_API_KEY) {
-      fs.unlinkSync(audioFile.path);
       return res.status(400).json({ error: 'OPENAI_API_KEY is not set' });
     }
 
-    // Whisper APIにファイルを送信
-    const formData = new FormData();
-    const audioBuffer = fs.readFileSync(audioFile.path);
-    const audioBlob = new Blob([audioBuffer], { type: 'audio/mpeg' });
-    formData.append('file', audioBlob, audioFile.originalname);
-    formData.append('model', 'whisper-1');
-    formData.append('response_format', 'verbose_json');
-    formData.append('timestamp_granularities[]', 'segment');
-    formData.append('language', 'ja');
+    // ファイルサイズチェック（25MB制限）
+    const stats = fs.statSync(audioFile.path);
+    let audioPath = audioFile.path;
+    let originalName = audioFile.originalname || 'audio.mp3';
 
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: formData
-    });
+    if (stats.size > 25 * 1024 * 1024) {
+      // 25MBを超える場合は自動圧縮
+      console.log(`Audio file too large (${(stats.size / 1024 / 1024).toFixed(1)}MB), compressing...`);
+      const compressedPath = audioFile.path + '.compressed.mp3';
+      tempFiles.push(compressedPath);
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || 'Whisper API error');
+      try {
+        compressAudio(audioFile.path, compressedPath);
+        audioPath = compressedPath;
+        originalName = 'audio.mp3';
+
+        const compressedStats = fs.statSync(compressedPath);
+        console.log(`Compressed to ${(compressedStats.size / 1024 / 1024).toFixed(1)}MB`);
+
+        // 圧縮後も25MBを超える場合はエラー
+        if (compressedStats.size > 25 * 1024 * 1024) {
+          return res.status(400).json({ error: '圧縮後も音声ファイルが大きすぎます。より短い音声をお試しください。' });
+        }
+      } catch (compressError) {
+        console.error('Audio compression failed:', compressError);
+        return res.status(500).json({ error: '音声圧縮に失敗しました: ' + compressError.message });
+      }
     }
 
-    const data = await response.json();
+    // OpenAI SDKを使用してWhisper APIにファイルを送信
+    const OpenAI = require('openai');
+    const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-    // セグメント情報を整形
-    const segments = (data.segments || []).map(seg => ({
-      start: seg.start,
-      end: seg.end,
-      text: seg.text.trim()
-    }));
+    // ファイル名を取得して正しい拡張子の一時ファイルを作成
+    const ext = path.extname(originalName) || '.mp3';
+    const tempPath = audioPath + ext;
+    tempFiles.push(tempPath);
 
-    // キャッシュに保存
-    transcriptCache = {
-      text: data.text,
-      segments: segments,
-      duration: data.duration
-    };
+    // ファイルを正しい拡張子でリネーム
+    fs.renameSync(audioPath, tempPath);
+    // リネーム元を削除リストから除外
+    tempFiles = tempFiles.filter(f => f !== audioPath);
 
-    // Cleanup
-    fs.unlinkSync(audioFile.path);
+    try {
+      const transcription = await openai.audio.transcriptions.create({
+        file: fs.createReadStream(tempPath),
+        model: 'whisper-1',
+        response_format: 'verbose_json',
+        timestamp_granularities: ['segment'],
+        language: 'ja'
+      });
 
-    res.json({
-      success: true,
-      text: data.text,
-      segments: segments,
-      duration: data.duration
-    });
+      const data = transcription;
+
+      // セグメント情報を整形
+      const segments = (data.segments || []).map(seg => ({
+        start: seg.start,
+        end: seg.end,
+        text: seg.text.trim()
+      }));
+
+      // キャッシュに保存
+      transcriptCache = {
+        text: data.text,
+        segments: segments,
+        duration: data.duration
+      };
+
+      // 一時ファイル削除
+      for (const f of tempFiles) {
+        try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (e) {}
+      }
+
+      res.json({
+        success: true,
+        text: data.text,
+        segments: segments,
+        duration: data.duration
+      });
+    } catch (innerError) {
+      // 内部エラー時に一時ファイルを削除
+      for (const f of tempFiles) {
+        try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (e) {}
+      }
+      throw innerError;
+    }
   } catch (error) {
-    if (req.file) fs.unlinkSync(req.file.path);
+    // エラー時のクリーンアップ
+    for (const f of tempFiles) {
+      try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (e) {}
+    }
     console.error('Transcribe error:', error);
     res.status(500).json({ error: error.message });
   }
@@ -619,18 +717,29 @@ ${audioSegments}
 5. JSON形式のみを出力（説明文は不要）`;
 
     const content = await callOpenAI(prompt);
+    console.log('GPT-5.2 response length:', content?.length || 0);
+    console.log('GPT-5.2 response preview:', content?.substring(0, 500));
 
     // JSON部分を抽出
     let markersData;
     try {
+      // まずコードブロック内のJSONを探す
+      let jsonStr = content;
+      const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        jsonStr = codeBlockMatch[1].trim();
+      }
+
       // JSONブロックを抽出
-      const jsonMatch = content.match(/\{[\s\S]*"markers"[\s\S]*\}/);
+      const jsonMatch = jsonStr.match(/\{[\s\S]*"markers"[\s\S]*\}/);
       if (!jsonMatch) {
+        console.error('No markers found in:', jsonStr.substring(0, 500));
         throw new Error('マーカーデータが見つかりません');
       }
       markersData = JSON.parse(jsonMatch[0]);
     } catch (parseError) {
-      console.error('JSON parse error:', parseError, 'Content:', content);
+      console.error('JSON parse error:', parseError.message);
+      console.error('Content was:', content?.substring(0, 1000) || 'empty');
       return res.status(500).json({ error: 'AIの出力をパースできませんでした。もう一度お試しください。' });
     }
 
