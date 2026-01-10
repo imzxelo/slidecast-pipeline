@@ -2011,32 +2011,39 @@
         formData.append('audio', audioFile);
         formData.append('markers', JSON.stringify(markers));
 
+        // 長時間の動画生成に対応するため、10分のタイムアウトを設定
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10分
+
         const response = await fetch('/api/generate', {
           method: 'POST',
           body: formData,
+          signal: controller.signal,
         });
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || '動画の生成に失敗しました');
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || '動画の生成に失敗しました');
         }
 
         // Complete the progress animation
         completeProgress();
 
-        // Download the video
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
+        // ダウンロードリンクから動画をダウンロード
         const a = document.createElement('a');
-        a.href = url;
-        a.download = 'slidecast-output.mp4';
+        a.href = data.downloadUrl;
+        a.download = data.filename || 'slidecast-output.mp4';
         a.click();
-        URL.revokeObjectURL(url);
+
+        const sizeMB = (data.size / 1024 / 1024).toFixed(1);
 
         // Wait a moment to show completion
         setTimeout(() => {
           hideLoadingModal();
-          alert('動画の生成が完了しました！');
+          alert(`動画の生成が完了しました！\nファイルサイズ: ${sizeMB}MB`);
         }, 1000);
       } catch (error) {
         hideLoadingModal();

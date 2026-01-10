@@ -25,6 +25,7 @@ const upload = multer({ dest: 'uploads/' });
 
 // Serve static files
 app.use(express.static('editor'));
+app.use('/output', express.static('output')); // 生成された動画のダウンロード用
 app.use(express.json());
 
 // Helper functions (from bin/slidecast.js)
@@ -158,11 +159,10 @@ function writeConcatFile(workdir, slides, durations) {
 
 function buildVideo(concatPath, workdir) {
   const videoPath = path.join(workdir, 'video.mp4');
-  // 最適化: スライドショー用に高速エンコード設定
-  // - framerate 1: 入力を1fpsとして扱う（静止画なので十分）
-  // - preset ultrafast: 最高速エンコード
-  // - tune stillimage: 静止画用最適化
-  // - crf 23: 標準品質（デフォルトより少し低いが十分）
+  // 最適化: macOS VideoToolboxでハードウェアアクセラレーション
+  // - h264_videotoolbox: GPU使用で高速エンコード（CPUの10倍以上高速）
+  // - fps=1: スライドショーなので1fpsで十分
+  // - b:v 2M: ビットレート2Mbps（スライドショーには十分）
   runOrThrow('ffmpeg', [
     '-y',
     '-f', 'concat',
@@ -170,10 +170,8 @@ function buildVideo(concatPath, workdir) {
     '-i', concatPath,
     '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=1',
     '-pix_fmt', 'yuv420p',
-    '-c:v', 'libx264',
-    '-preset', 'ultrafast',
-    '-tune', 'stillimage',
-    '-crf', '23',
+    '-c:v', 'h264_videotoolbox',
+    '-b:v', '2M',
     videoPath,
   ]);
   return videoPath;
@@ -197,6 +195,8 @@ app.post('/api/generate', upload.fields([
   { name: 'audio', maxCount: 1 }
 ]), async (req, res) => {
   const workdir = path.join('work', `gen-${Date.now()}`);
+  const startTime = Date.now();
+  console.log('[Video Generate] Starting video generation...');
 
   try {
     // Get uploaded files
@@ -208,16 +208,23 @@ app.post('/api/generate', upload.fields([
       return res.status(400).json({ error: 'PDF and audio files are required' });
     }
 
+    console.log(`[Video Generate] PDF: ${pdfFile.originalname}, Audio: ${audioFile.originalname}`);
+    console.log(`[Video Generate] Markers: ${markers.length} markers`);
+
     // Create workdir
     fs.mkdirSync(workdir, { recursive: true });
 
     // Get audio duration
+    console.log('[Video Generate] Getting audio duration...');
     const durationSeconds = getAudioDurationSeconds(audioFile.path);
+    console.log(`[Video Generate] Audio duration: ${durationSeconds}s (${(durationSeconds/60).toFixed(1)} min)`);
 
     // Convert PDF to PNG
+    console.log('[Video Generate] Converting PDF to PNG...');
     convertPdfToPng(pdfFile.path, workdir);
     const slides = listSlideImages(workdir);
     const slideMap = buildSlideIndexMap(slides);
+    console.log(`[Video Generate] Converted ${slides.length} slides`);
 
     // Calculate durations
     let sequence = slides;
@@ -232,19 +239,43 @@ app.post('/api/generate', upload.fields([
     }
 
     // Generate video
+    console.log('[Video Generate] Building video (this may take a while for long videos)...');
     const concatPath = writeConcatFile(workdir, sequence, durations);
     const videoPath = buildVideo(concatPath, workdir);
+    console.log(`[Video Generate] Video built in ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
 
     // Merge audio
+    console.log('[Video Generate] Merging audio...');
     const outputPath = path.join(workdir, 'output.mp4');
     mergeAudio(videoPath, audioFile.path, outputPath);
 
-    // Send file
-    res.download(outputPath, 'slidecast-output.mp4', (err) => {
-      // Cleanup
-      fs.rmSync(workdir, { recursive: true, force: true });
-      if (pdfFile) fs.unlinkSync(pdfFile.path);
-      if (audioFile) fs.unlinkSync(audioFile.path);
+    // Check output file size
+    const outputStats = fs.statSync(outputPath);
+    console.log(`[Video Generate] Output file size: ${(outputStats.size / 1024 / 1024).toFixed(1)}MB`);
+    console.log(`[Video Generate] Total processing time: ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
+
+    // 動画をoutputフォルダに移動（ダウンロードリンク用）
+    const outputDir = path.join(__dirname, 'output');
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+    const finalFilename = `slidecast-${Date.now()}.mp4`;
+    const finalPath = path.join(outputDir, finalFilename);
+    fs.copyFileSync(outputPath, finalPath);
+    console.log(`[Video Generate] Video saved to: ${finalPath}`);
+
+    // Cleanup workdir
+    fs.rmSync(workdir, { recursive: true, force: true });
+    if (pdfFile) fs.unlinkSync(pdfFile.path);
+    if (audioFile) fs.unlinkSync(audioFile.path);
+
+    // ダウンロードURLを返す（ストリーミングではなくリンク）
+    console.log('[Video Generate] Sending download URL to client...');
+    res.json({
+      success: true,
+      downloadUrl: `/output/${finalFilename}`,
+      filename: finalFilename,
+      size: outputStats.size
     });
 
   } catch (error) {
@@ -255,7 +286,7 @@ app.post('/api/generate', upload.fields([
     if (req.files['pdf']?.[0]) fs.unlinkSync(req.files['pdf'][0].path);
     if (req.files['audio']?.[0]) fs.unlinkSync(req.files['audio'][0].path);
 
-    console.error('Generation error:', error);
+    console.error('[Video Generate] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -772,7 +803,7 @@ ${audioSegments}
   }
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Slide Sync Editor running at http://localhost:${PORT}`);
 
   // OpenAI status
@@ -789,3 +820,7 @@ app.listen(PORT, () => {
     console.log('Gemini 3.0 Flash (gemini-3-flash-preview): enabled');
   }
 });
+
+// 長時間の動画生成に対応するためタイムアウトを10分に延長
+server.timeout = 10 * 60 * 1000; // 10 minutes
+server.keepAliveTimeout = 10 * 60 * 1000;
