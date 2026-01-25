@@ -1,89 +1,75 @@
-# slidecast-pipeline
+# Slidecast Pipeline
 
-PDFスライドと音声ファイルからMP4動画を生成するツール
+PDFスライドと音声ファイルから、MP4動画を作成するツールです。
 
-## 機能
+---
 
-- **CLI ツール**: コマンドラインから動画を生成
-- **Web エディタ**: ブラウザでマーカーを設定して動画を生成
-- **AI 支援機能**: 動画の概要欄やクイズを自動生成（オプション）
+## このツールでできること
 
-## インストール
+- PDFファイル（スライド）と音声ファイル（ナレーション）を組み合わせて、動画を作成できます
+- スライドの切り替えタイミングを、手動で設定できます
+- AIが自動でスライドの切り替えタイミングを提案してくれます（オプション機能）
+- 動画の概要欄やクイズをAIが自動生成してくれます（オプション機能）
 
-```bash
-npm install
-```
+---
 
-## 使い方
+## はじめて使う方へ
 
-### Web エディタ（推奨）
+以下のドキュメントを、番号順にお読みください。
 
-```bash
-node server.js
-```
+| 順番 | ドキュメント | 内容 |
+|:----:|--------------|------|
+| 1 | [初期セットアップ](docs/1_初期セットアップ.md) | ソフトのインストール方法 |
+| 2 | [API設定ガイド](docs/2_API設定ガイド.md) | AI機能を使うための設定 |
+| 3 | [使い方ガイド](docs/3_使い方ガイド.md) | 日常の操作方法 |
 
-ブラウザで http://localhost:3001 を開き、PDF と音声ファイルをアップロードしてマーカーを設定します。
+---
 
-### CLI ツール
+## 困ったときは
 
-```bash
-# 等間隔でスライド切り替え
-node bin/slidecast.js --pdf スライド.pdf --audio 音声.m4a --out 出力.mp4
+- 操作がわからないとき → [使い方ガイド](docs/3_使い方ガイド.md)を確認
+- エラーが出たとき → 担当者（Makoto）に連絡してください
 
-# マーカーファイルを使用
-node bin/slidecast.js --pdf スライド.pdf --audio 音声.m4a --markers markers.json --out 出力.mp4
-```
+---
 
-## AI 支援機能の設定
+## 動作環境
 
-動画生成中に AI 支援機能（概要欄生成、キーポイント抽出、クイズ生成）を使用するには、OpenAI API キーが必要です。GPT-5.2 モデルを使用します。
+- Windows 11
+- Google Chrome（ブラウザ）
+- インターネット接続（AI機能を使う場合）
 
-### API キーの取得
+---
 
-1. [OpenAI Platform](https://platform.openai.com/api-keys) にアクセス
-2. アカウントを作成またはログイン
-3. API Keys ページで新しいキーを作成
+## 開発者向け情報
 
-### API キーの設定
+開発者向けのドキュメントやファイルは以下に格納されています：
 
-プロジェクトルートの `.env` ファイルを編集してください：
+| フォルダ | 内容 |
+|----------|------|
+| `_dev/` | タスク管理、Docker設定、テストスクリプト等 |
+| `docs/dev/` | 要件定義、引き継ぎ、エージェントルール等 |
+| `tests/` | Playwrightテストコード |
 
-```bash
-OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-その後、サーバーを起動します：
+### 開発環境セットアップ（macOS）
 
 ```bash
-node server.js
-```
-
-API キーが設定されていない場合でも、動画生成機能は通常通り使用できます。AI 機能のみが無効になります。
-
-## 依存関係
-
-- Node.js 18+
-- ffmpeg
-- pdftoppm (poppler-utils)
-
-### macOS
-
-```bash
+# 依存ツール
 brew install ffmpeg poppler
-```
 
-### Ubuntu/Debian
+# npm依存
+npm install
 
-```bash
-sudo apt-get install ffmpeg poppler-utils
-```
+# サーバー起動
+node server.js
+# → http://localhost:3001
 
-## テスト
-
-```bash
+# テスト実行
 npx playwright test
 ```
 
-## ライセンス
+### 技術スタック
 
-MIT
+- Node.js + Express
+- PDF.js（PDF表示）
+- OpenAI GPT-5.2 / Gemini 3.0 Flash（AI機能）
+- ffmpeg / pdftoppm（動画生成）
