@@ -1,9 +1,20 @@
+const path = require('path');
+const fs = require('fs');
+
+// .envファイルのBOM除去（Windowsメモ帳対策）
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  let content = fs.readFileSync(envPath, 'utf8');
+  if (content.charCodeAt(0) === 0xFEFF) {
+    console.log('[Config] Removing BOM from .env file');
+    fs.writeFileSync(envPath, content.slice(1), 'utf8');
+  }
+}
+
 require('dotenv').config();
 
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const { spawnSync } = require('child_process');
 const { GoogleGenAI } = require('@google/genai');
 
@@ -140,7 +151,10 @@ function computeEqualDurations(totalSeconds, count) {
 }
 
 function escapePath(filePath) {
-  return filePath.replace(/'/g, "'\\''");
+  // Windowsのバックスラッシュをスラッシュに変換（ffmpegはスラッシュを受け付ける）
+  let normalized = filePath.replace(/\\/g, '/');
+  // シングルクォートをエスケープ
+  return normalized.replace(/'/g, "'\\''");
 }
 
 function writeConcatFile(workdir, slides, durations) {
@@ -159,21 +173,35 @@ function writeConcatFile(workdir, slides, durations) {
 
 function buildVideo(concatPath, workdir) {
   const videoPath = path.join(workdir, 'video.mp4');
-  // 最適化: macOS VideoToolboxでハードウェアアクセラレーション
-  // - h264_videotoolbox: GPU使用で高速エンコード（CPUの10倍以上高速）
-  // - fps=1: スライドショーなので1fpsで十分
-  // - b:v 2M: ビットレート2Mbps（スライドショーには十分）
-  runOrThrow('ffmpeg', [
+  
+  // エンコーダー選択: OS判定してハードウェア/ソフトウェアを切り替え
+  // - macOS: h264_videotoolbox (GPU、10倍高速)
+  // - Windows/Linux: libx264 (CPU、互換性重視)
+  const isMac = process.platform === 'darwin';
+  const encoder = isMac ? 'h264_videotoolbox' : 'libx264';
+  
+  const ffmpegArgs = [
     '-y',
     '-f', 'concat',
     '-safe', '0',
     '-i', concatPath,
     '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=1',
     '-pix_fmt', 'yuv420p',
-    '-c:v', 'h264_videotoolbox',
-    '-b:v', '2M',
-    videoPath,
-  ]);
+    '-c:v', encoder,
+  ];
+  
+  // libx264の場合は品質プリセット追加（速度と品質のバランス）
+  if (!isMac) {
+    ffmpegArgs.push('-preset', 'fast');
+    ffmpegArgs.push('-crf', '23');
+  } else {
+    ffmpegArgs.push('-b:v', '2M');
+  }
+  
+  ffmpegArgs.push(videoPath);
+  
+  console.log(`[Video] Using encoder: ${encoder} (platform: ${process.platform})`);
+  runOrThrow('ffmpeg', ffmpegArgs);
   return videoPath;
 }
 
@@ -283,8 +311,8 @@ app.post('/api/generate', upload.fields([
     if (fs.existsSync(workdir)) {
       fs.rmSync(workdir, { recursive: true, force: true });
     }
-    if (req.files['pdf']?.[0]) fs.unlinkSync(req.files['pdf'][0].path);
-    if (req.files['audio']?.[0]) fs.unlinkSync(req.files['audio'][0].path);
+    try { if (req.files['pdf']?.[0]?.path) fs.unlinkSync(req.files['pdf'][0].path); } catch (e) {}
+    try { if (req.files['audio']?.[0]?.path) fs.unlinkSync(req.files['audio'][0].path); } catch (e) {}
 
     console.error('[Video Generate] Error:', error.message);
     res.status(500).json({ error: error.message });
@@ -819,6 +847,17 @@ const server = app.listen(PORT, () => {
   } else {
     console.log('Gemini 3.0 Flash (gemini-3-flash-preview): enabled');
   }
+});
+
+// ポート競合時のエラーハンドリング
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\nエラー: ポート ${PORT} は既に使用されています。`);
+    console.error('他のアプリケーションを閉じるか、ポート番号を変更してください。');
+  } else {
+    console.error('サーバーエラー:', err.message);
+  }
+  process.exit(1);
 });
 
 // 長時間の動画生成に対応するためタイムアウトを10分に延長
