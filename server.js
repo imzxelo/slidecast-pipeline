@@ -110,6 +110,23 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
 const GEMINI_CONCURRENCY = Math.max(1, getEnvInt('GEMINI_CONCURRENCY', 3));
 const AUTO_MARKER_TRANSCRIPT_WINDOW_SEC = Math.max(5, getEnvInt('AUTO_MARKER_TRANSCRIPT_WINDOW_SEC', 20));
 
+function looksLikePlaceholderOpenAIKey(key) {
+  const k = String(key || '').trim();
+  if (!k) return false;
+  if (/sk-xxxxxxxx/i.test(k)) return true;
+  if (/sk-[x_]{8,}/i.test(k)) return true;
+  if (k.length < 20) return true;
+  return false;
+}
+
+function looksLikePlaceholderGeminiKey(key) {
+  const k = String(key || '').trim();
+  if (!k) return false;
+  if (/AIza[x_]{8,}/i.test(k)) return true;
+  if (k.length < 20) return true;
+  return false;
+}
+
 // Gemini client
 let geminiClient = null;
 if (GEMINI_API_KEY) {
@@ -123,6 +140,30 @@ const upload = multer({ dest: 'uploads/' });
 app.use(express.static('editor'));
 app.use('/output', express.static('output')); // 生成された動画のダウンロード用
 app.use(express.json());
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    ok: true,
+    node: process.version,
+    openai: {
+      configured: Boolean(OPENAI_API_KEY),
+      placeholder: looksLikePlaceholderOpenAIKey(OPENAI_API_KEY),
+      model: OPENAI_MODEL,
+    },
+    gemini: {
+      configured: Boolean(GEMINI_API_KEY),
+      placeholder: looksLikePlaceholderGeminiKey(GEMINI_API_KEY),
+      model: GEMINI_MODEL,
+      concurrency: GEMINI_CONCURRENCY,
+    },
+    limits: {
+      ai_timeout_ms: AI_TIMEOUT_MS,
+      whisper_timeout_ms: WHISPER_TIMEOUT_MS,
+      ai_retry_max: AI_RETRY_MAX,
+      auto_marker_transcript_window_sec: AUTO_MARKER_TRANSCRIPT_WINDOW_SEC,
+    }
+  });
+});
 
 // Helper functions (from bin/slidecast.js)
 function formatCommand(cmd, args) {
@@ -1252,15 +1293,19 @@ const server = app.listen(PORT, () => {
   // OpenAI status
   if (!OPENAI_API_KEY) {
     console.log('Note: OPENAI_API_KEY is not set. AI generation features will not work.');
+  } else if (looksLikePlaceholderOpenAIKey(OPENAI_API_KEY)) {
+    console.log('Warning: OPENAI_API_KEY looks like a placeholder. AI generation will likely fail (401).');
   } else {
-    console.log('OpenAI GPT-5.2 (Responses API): enabled');
+    console.log(`OpenAI (Responses API): enabled (model: ${OPENAI_MODEL})`);
   }
 
   // Gemini status
   if (!GEMINI_API_KEY) {
     console.log('Note: GEMINI_API_KEY is not set. PDF analysis features will not work.');
+  } else if (looksLikePlaceholderGeminiKey(GEMINI_API_KEY)) {
+    console.log('Warning: GEMINI_API_KEY looks like a placeholder. PDF analysis will likely fail.');
   } else {
-    console.log('Gemini 3.0 Flash (gemini-3-flash-preview): enabled');
+    console.log(`Gemini: enabled (model: ${GEMINI_MODEL}, concurrency: ${GEMINI_CONCURRENCY})`);
   }
 });
 
