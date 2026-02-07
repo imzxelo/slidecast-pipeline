@@ -850,6 +850,25 @@ ${audioSegments}
   }
 });
 
+function ensureNodeVersion() {
+  const raw = String(process.versions?.node || '0');
+  const major = Number(raw.split('.')[0]);
+  const fetchOk = typeof fetch === 'function';
+
+  if (Number.isFinite(major) && major >= 18 && fetchOk) return;
+
+  console.error('========================================');
+  console.error('エラー: Node.js のバージョンが古すぎます');
+  console.error('========================================');
+  console.error(`現在の Node.js: v${raw}`);
+  console.error('');
+  console.error('このアプリは Node.js 18 以上が必要です（推奨: Node.js LTS）。');
+  if (process.platform === 'win32') {
+    console.error('setup.ps1 を実行して Node.js を更新してください。');
+  }
+  process.exit(1);
+}
+
 // 依存コマンドのチェック（サーバー起動前）
 function checkDependencies() {
   const locator = process.platform === 'win32' ? 'where' : 'which';
@@ -884,6 +903,7 @@ function checkDependencies() {
   process.exit(1);
 }
 
+ensureNodeVersion();
 checkDependencies();
 
 const server = app.listen(PORT, () => {

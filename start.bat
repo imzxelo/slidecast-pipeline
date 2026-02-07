@@ -41,6 +41,20 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+REM Node.js のバージョン確認（18+ 必須）
+node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 18 ? 0 : 1)" > nul 2>&1
+if %errorlevel% neq 0 (
+    echo ========================================
+    echo  エラー: Node.js のバージョンが古すぎます
+    echo ========================================
+    echo.
+    echo このアプリは Node.js 18 以上が必要です。
+    echo setup.ps1 を実行して Node.js (LTS) をインストールしてください。
+    echo.
+    pause
+    exit /b 1
+)
+
 REM ffmpeg/ffprobe が使えるか確認
 where ffmpeg > nul 2>&1
 if %errorlevel% neq 0 (

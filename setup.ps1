@@ -223,6 +223,40 @@ Write-Host ""
 if (Get-Command node -ErrorAction SilentlyContinue) {
     $nodeVersion = node --version
     Write-Host "[OK] Node.jsは既にインストールされています。（バージョン: $nodeVersion）" -ForegroundColor Green
+
+    # Node.js 18+ が必要（古い場合はLTSをインストール）
+    $nodeMajor = 0
+    if ($nodeVersion -match '^v(\d+)') {
+        $nodeMajor = [int]$Matches[1]
+    }
+
+    if ($nodeMajor -lt 18) {
+        Write-Host ""
+        Write-Host "========================================" -ForegroundColor Yellow
+        Write-Host " 警告: Node.js のバージョンが古すぎます" -ForegroundColor Yellow
+        Write-Host "========================================" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "このアプリは Node.js 18 以上が必要です。"
+        Write-Host "Node.js (LTS) をインストールします..." -ForegroundColor Cyan
+        Write-Host ""
+
+        try {
+            choco install nodejs-lts -y
+
+            # PATHを更新
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+
+            $nodeVersion = node --version
+            Write-Host ""
+            Write-Host "[OK] Node.js を更新しました。（バージョン: $nodeVersion）" -ForegroundColor Green
+        } catch {
+            Write-Host ""
+            Write-Host "[エラー] Node.jsのインストールに失敗しました。" -ForegroundColor Red
+            Write-Host "エラー詳細: $_" -ForegroundColor Red
+            Read-Host "Enterキーを押すと終了します"
+            exit 1
+        }
+    }
 } else {
     Write-Host "Node.jsをインストールしています..." -ForegroundColor Cyan
     Write-Host "（数分かかる場合があります。お待ちください...）"
