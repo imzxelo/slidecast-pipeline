@@ -7,14 +7,25 @@ const OUTPUT_DIR = path.join(ROOT_DIR, 'output');
 const UPLOADS_DIR = path.join(ROOT_DIR, 'uploads');
 const WORK_DIR = path.join(ROOT_DIR, 'work');
 
-// Ensure expected directories exist even when started from a different CWD.
-for (const dir of [OUTPUT_DIR, UPLOADS_DIR, WORK_DIR]) {
+function ensureDirExists(dirPath) {
   try {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  } catch {
-    // ignore
+    fs.mkdirSync(dirPath, { recursive: true });
+  } catch (err) {
+    console.error('========================================');
+    console.error('エラー: 必要なフォルダを作成できません');
+    console.error('========================================');
+    console.error(`作成できないフォルダ: ${dirPath}`);
+    console.error(`理由: ${err?.message || err}`);
+    console.error('');
+    console.error('このフォルダに書き込み権限がある場所に配置してから、再度お試しください。');
+    process.exit(1);
   }
 }
+
+// Ensure expected directories exist even when started from a different CWD.
+ensureDirExists(OUTPUT_DIR);
+ensureDirExists(UPLOADS_DIR);
+ensureDirExists(WORK_DIR);
 
 // .envファイルのBOM除去（Windowsメモ帳対策）
 const envPath = path.join(ROOT_DIR, '.env');
