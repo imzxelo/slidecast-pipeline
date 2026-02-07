@@ -11,7 +11,7 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-require('dotenv').config({ path: envPath });
+require('dotenv').config({ path: envPath, quiet: true });
 
 const express = require('express');
 const multer = require('multer');
