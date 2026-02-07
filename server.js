@@ -492,6 +492,11 @@ function isGeminiRetryableError(err) {
   return /429|resource_exhausted|unavailable|deadline_exceeded|timeout/i.test(msg);
 }
 
+function isGeminiAuthError(err) {
+  const msg = String(err?.message || err || '');
+  return /401|403|unauthenticated|permission_denied|api key|invalid/i.test(msg.toLowerCase());
+}
+
 // Gemini 3.0 Flash でスライドを要約
 async function summarizeSlides(pdfPath) {
   if (!geminiClient) {
@@ -550,6 +555,9 @@ async function summarizeSlides(pdfPath) {
           summary: response.text || ''
         };
       } catch (err) {
+        if (isGeminiAuthError(err)) {
+          throw new Error('Gemini APIキーが無効です。GEMINI_API_KEY を確認してください。');
+        }
         const message = truncate(err?.message || err, 200);
         console.error(`[Gemini] Slide ${i + 1} summary failed:`, message);
         return {
