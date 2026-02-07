@@ -25,6 +25,91 @@ const PORT = 3001;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
+function getEnvInt(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === null || raw === '') return fallback;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function truncate(text, maxChars) {
+  const s = String(text ?? '');
+  if (s.length <= maxChars) return s;
+  return `${s.slice(0, maxChars)}...`;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withTimeout(promise, ms, label) {
+  const timeoutMs = Number.isFinite(ms) && ms > 0 ? ms : 0;
+  if (!timeoutMs) return await promise;
+
+  let timeoutId = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label || 'Operation'} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+async function withRetry(fn, opts = {}) {
+  const maxRetries = Number.isFinite(opts.maxRetries) ? opts.maxRetries : 0;
+  const baseDelayMs = Number.isFinite(opts.baseDelayMs) ? opts.baseDelayMs : 500;
+  const maxDelayMs = Number.isFinite(opts.maxDelayMs) ? opts.maxDelayMs : 8000;
+  const shouldRetry = typeof opts.shouldRetry === 'function' ? opts.shouldRetry : (() => false);
+
+  let attempt = 0;
+  // attempt: 0..maxRetries (total maxRetries+1 tries)
+  while (true) {
+    try {
+      return await fn(attempt);
+    } catch (err) {
+      if (attempt >= maxRetries || !shouldRetry(err, attempt)) throw err;
+      const delay = Math.min(maxDelayMs, baseDelayMs * (2 ** attempt));
+      const jitter = Math.floor(Math.random() * Math.min(250, delay));
+      await sleep(delay + jitter);
+      attempt += 1;
+    }
+  }
+}
+
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const list = Array.isArray(items) ? items : [];
+  const limit = Math.max(1, Number(concurrency) || 1);
+  const results = new Array(list.length);
+  let nextIndex = 0;
+
+  const workers = new Array(Math.min(limit, list.length)).fill(0).map(async () => {
+    while (true) {
+      const idx = nextIndex;
+      nextIndex += 1;
+      if (idx >= list.length) return;
+      results[idx] = await mapper(list[idx], idx);
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
+}
+
+const DEBUG_AI = process.env.DEBUG_AI === '1';
+const AI_TIMEOUT_MS = getEnvInt('AI_TIMEOUT_MS', 120000);
+const WHISPER_TIMEOUT_MS = getEnvInt('WHISPER_TIMEOUT_MS', 10 * 60 * 1000);
+const AI_RETRY_MAX = getEnvInt('AI_RETRY_MAX', 2);
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.2';
+const OPENAI_REASONING_EFFORT = process.env.OPENAI_REASONING_EFFORT || 'medium';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
+const GEMINI_CONCURRENCY = Math.max(1, getEnvInt('GEMINI_CONCURRENCY', 3));
+const AUTO_MARKER_TRANSCRIPT_WINDOW_SEC = Math.max(5, getEnvInt('AUTO_MARKER_TRANSCRIPT_WINDOW_SEC', 20));
+
 // Gemini client
 let geminiClient = null;
 if (GEMINI_API_KEY) {
@@ -71,6 +156,22 @@ function runOrThrow(cmd, args) {
   if (result.status !== 0) {
     const stderr = result.stderr ?? '';
     throw new Error(`Command failed: ${formatCommand(cmd, args)}\n${stderr}`.trimEnd());
+  }
+}
+
+function safeUnlink(filePath) {
+  if (!filePath) return;
+  try {
+    fs.unlinkSync(filePath);
+  } catch {
+    // ignore
+  }
+}
+
+function cleanupFiles(filePaths) {
+  if (!Array.isArray(filePaths)) return;
+  for (const f of filePaths) {
+    safeUnlink(f);
   }
 }
 
@@ -252,6 +353,8 @@ app.post('/api/generate', upload.fields([
     const markers = JSON.parse(req.body.markers || '[]');
 
     if (!pdfFile || !audioFile) {
+      safeUnlink(pdfFile?.path);
+      safeUnlink(audioFile?.path);
       return res.status(400).json({ error: 'PDF and audio files are required' });
     }
 
@@ -313,8 +416,8 @@ app.post('/api/generate', upload.fields([
 
     // Cleanup workdir
     fs.rmSync(workdir, { recursive: true, force: true });
-    if (pdfFile) fs.unlinkSync(pdfFile.path);
-    if (audioFile) fs.unlinkSync(audioFile.path);
+    safeUnlink(pdfFile?.path);
+    safeUnlink(audioFile?.path);
 
     // ダウンロードURLを返す（ストリーミングではなくリンク）
     console.log('[Video Generate] Sending download URL to client...');
@@ -330,8 +433,8 @@ app.post('/api/generate', upload.fields([
     if (fs.existsSync(workdir)) {
       fs.rmSync(workdir, { recursive: true, force: true });
     }
-    try { if (req.files['pdf']?.[0]?.path) fs.unlinkSync(req.files['pdf'][0].path); } catch (e) {}
-    try { if (req.files['audio']?.[0]?.path) fs.unlinkSync(req.files['audio'][0].path); } catch (e) {}
+    safeUnlink(req.files['pdf']?.[0]?.path);
+    safeUnlink(req.files['audio']?.[0]?.path);
 
     console.error('[Video Generate] Error:', error.message);
     res.status(500).json({ error: error.message });
@@ -340,6 +443,11 @@ app.post('/api/generate', upload.fields([
 
 // PDF slide summaries cache (per session)
 let slideSummariesCache = null;
+
+function isGeminiRetryableError(err) {
+  const msg = String(err?.message || err || '');
+  return /429|resource_exhausted|unavailable|deadline_exceeded|timeout/i.test(msg);
+}
 
 // Gemini 3.0 Flash でスライドを要約
 async function summarizeSlides(pdfPath) {
@@ -355,42 +463,59 @@ async function summarizeSlides(pdfPath) {
     convertPdfToPng(pdfPath, workdir);
     const slides = listSlideImages(workdir);
 
-    console.log(`Processing ${slides.length} slides in parallel...`);
+    console.log(`Processing ${slides.length} slides (Gemini: ${GEMINI_MODEL}, concurrency: ${GEMINI_CONCURRENCY})...`);
     const startTime = Date.now();
 
-    // 全スライドを並列処理（Gemini APIのレート制限に注意）
-    const summaryPromises = slides.map(async (slide, i) => {
+    const summaries = await mapWithConcurrency(slides, GEMINI_CONCURRENCY, async (slide, i) => {
       const slidePath = path.join(workdir, slide);
       const imageData = fs.readFileSync(slidePath);
       const base64Image = imageData.toString('base64');
 
-      const response = await geminiClient.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: [{
-          parts: [
-            {
-              inlineData: {
-                mimeType: 'image/png',
-                data: base64Image
+      try {
+        const response = await withRetry(
+          async () => await withTimeout(
+            geminiClient.models.generateContent({
+              model: GEMINI_MODEL,
+              contents: [{
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: 'image/png',
+                      data: base64Image
+                    }
+                  },
+                  {
+                    text: 'このスライドの内容を日本語で簡潔に要約してください。箇条書きで主要なポイントを3つ以内で挙げてください。'
+                  }
+                ]
+              }],
+              config: {
+                thinkingConfig: { thinkingBudget: 0 }
               }
-            },
-            {
-              text: 'このスライドの内容を日本語で簡潔に要約してください。箇条書きで主要なポイントを3つ以内で挙げてください。'
-            }
-          ]
-        }],
-        config: {
-          thinkingConfig: { thinkingBudget: 0 }
-        }
-      });
+            }),
+            AI_TIMEOUT_MS,
+            'Gemini generateContent'
+          ),
+          {
+            maxRetries: AI_RETRY_MAX,
+            shouldRetry: (err) => isGeminiRetryableError(err),
+          }
+        );
 
-      return {
-        slide: i + 1,
-        summary: response.text || ''
-      };
+        return {
+          slide: i + 1,
+          summary: response.text || ''
+        };
+      } catch (err) {
+        const message = truncate(err?.message || err, 200);
+        console.error(`[Gemini] Slide ${i + 1} summary failed:`, message);
+        return {
+          slide: i + 1,
+          summary: `（要約失敗: ${message}）`
+        };
+      }
     });
 
-    const summaries = await Promise.all(summaryPromises);
     // スライド番号順にソート
     summaries.sort((a, b) => a.slide - b.slide);
 
@@ -419,59 +544,162 @@ async function callOpenAI(prompt) {
     throw new Error('OPENAI_API_KEY is not set. Please add it to .env file.');
   }
 
-  console.log('Calling OpenAI Responses API...');
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENAI_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-5.2',
-      input: prompt,
-      reasoning: { effort: 'medium' }
-    })
-  });
+  const url = 'https://api.openai.com/v1/responses';
 
-  console.log('OpenAI API response status:', response.status);
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('OpenAI API error response:', errorText);
-    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+  function parseJson(text) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return null;
+    }
   }
 
-  const data = await response.json();
-  console.log('OpenAI response status:', data.status);
-  console.log('OpenAI output array:', JSON.stringify(data.output, null, 2));
+  function extractOpenAIErrorText(status, rawText) {
+    const json = parseJson(rawText);
+    const detail = json?.error?.message || json?.message || rawText || '';
+    const trimmed = String(detail).trim();
+
+    if (status === 401 || status === 403) {
+      return `OpenAI APIキーが無効です (${status})。OPENAI_API_KEY を確認してください。`;
+    }
+    if (status === 429) {
+      return `OpenAI API のレート制限/クォータに達しました (${status})。少し待ってから再試行してください。`;
+    }
+    if (status >= 500) {
+      return `OpenAI API が一時的に失敗しました (${status})。少し待ってから再試行してください。`;
+    }
+    return `OpenAI API error (${status}): ${truncate(trimmed, 800)}`;
+  }
+
+  function isRetryableStatus(status) {
+    return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+  }
+
+  async function requestResponses(body) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const err = new Error(extractOpenAIErrorText(response.status, errorText));
+        err.status = response.status;
+        err.retryable = isRetryableStatus(response.status);
+        if (DEBUG_AI) {
+          console.error('[OpenAI] Error response:', truncate(errorText, 2000));
+        }
+        throw err;
+      }
+
+      return await response.json();
+    } catch (err) {
+      if (err?.name === 'AbortError') {
+        const e = new Error(`OpenAI API request timed out after ${AI_TIMEOUT_MS}ms`);
+        e.retryable = true;
+        throw e;
+      }
+      // Network errors etc.
+      if (err && err.retryable === undefined) {
+        err.retryable = true;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  const bodyWithReasoning = {
+    model: OPENAI_MODEL,
+    input: prompt,
+  };
+
+  if (OPENAI_REASONING_EFFORT && OPENAI_REASONING_EFFORT !== 'none') {
+    bodyWithReasoning.reasoning = { effort: OPENAI_REASONING_EFFORT };
+  }
+
+  const bodyWithoutReasoning = {
+    model: OPENAI_MODEL,
+    input: prompt,
+  };
+
+  if (DEBUG_AI) {
+    console.log(`[OpenAI] Calling Responses API (model: ${OPENAI_MODEL}, timeout: ${AI_TIMEOUT_MS}ms, retries: ${AI_RETRY_MAX})`);
+  }
+
+  let data;
+  try {
+    data = await withRetry(
+      async () => await requestResponses(bodyWithReasoning),
+      { maxRetries: AI_RETRY_MAX, shouldRetry: (err) => err?.retryable === true }
+    );
+  } catch (err) {
+    // Some models don't accept the "reasoning" parameter; fallback to a plain request once.
+    if (bodyWithReasoning.reasoning && err?.status === 400) {
+      const msg = String(err?.message || '');
+      if (msg.toLowerCase().includes('reasoning')) {
+        data = await withRetry(
+          async () => await requestResponses(bodyWithoutReasoning),
+          { maxRetries: AI_RETRY_MAX, shouldRetry: (e) => e?.retryable === true }
+        );
+      } else {
+        throw err;
+      }
+    } else {
+      throw err;
+    }
+  }
+
+  if (DEBUG_AI) {
+    console.log('[OpenAI] Response status:', data?.status);
+  }
+
+  if (typeof data?.output_text === 'string' && data.output_text.length > 0) {
+    return data.output_text;
+  }
 
   // Responses API returns output in nested structure
-  // Try to find text in various possible locations
   let result = '';
-  if (data.output && Array.isArray(data.output)) {
+  if (data?.output && Array.isArray(data.output)) {
     for (const outputItem of data.output) {
-      if (outputItem.content && Array.isArray(outputItem.content)) {
+      if (outputItem?.content && Array.isArray(outputItem.content)) {
         for (const contentItem of outputItem.content) {
-          if (contentItem.text) {
+          if (typeof contentItem?.text === 'string') {
             result += contentItem.text;
           }
         }
       }
-      // Also check for direct text property
-      if (outputItem.text) {
+      if (typeof outputItem?.text === 'string') {
         result += outputItem.text;
       }
     }
   }
 
-  console.log('Extracted text length:', result.length);
-  console.log('Extracted text preview:', result.substring(0, 200));
   return result;
+}
+
+function isOpenAITransientError(err) {
+  const status = Number(err?.status ?? err?.statusCode);
+  if (status === 429 || status === 500 || status === 502 || status === 503 || status === 504) return true;
+  const msg = String(err?.message || err || '');
+  return /timeout|timed out|econnreset|etimedout|eai_again|enotfound|socket hang up/i.test(msg.toLowerCase());
 }
 
 // Generate summary for video description
 app.post('/api/ai/summary', async (req, res) => {
   try {
+    if (!OPENAI_API_KEY) {
+      return res.status(400).json({ error: 'OPENAI_API_KEY is not set' });
+    }
     const { pdfName, audioName, slideCount, duration } = req.body;
 
     // スライド要約がキャッシュされていれば使用
@@ -507,6 +735,9 @@ PDF名: ${pdfName}
 // Extract key points from presentation
 app.post('/api/ai/keypoints', async (req, res) => {
   try {
+    if (!OPENAI_API_KEY) {
+      return res.status(400).json({ error: 'OPENAI_API_KEY is not set' });
+    }
     const { pdfName, slideCount, markers, duration } = req.body;
 
     // スライド要約がキャッシュされていれば使用
@@ -542,6 +773,9 @@ PDF名: ${pdfName}
 // Generate quiz questions
 app.post('/api/ai/quiz', async (req, res) => {
   try {
+    if (!OPENAI_API_KEY) {
+      return res.status(400).json({ error: 'OPENAI_API_KEY is not set' });
+    }
     const { pdfName, slideCount } = req.body;
 
     // スライド要約がキャッシュされていれば使用
@@ -584,8 +818,11 @@ app.post('/api/ai/analyze', upload.single('pdf'), async (req, res) => {
       return res.status(400).json({ error: 'PDF file is required' });
     }
 
+    // Avoid stale cache if a new analysis fails mid-way.
+    slideSummariesCache = null;
+
     if (!geminiClient) {
-      fs.unlinkSync(pdfFile.path);
+      safeUnlink(pdfFile.path);
       return res.status(400).json({ error: 'GEMINI_API_KEY is not set' });
     }
 
@@ -593,7 +830,7 @@ app.post('/api/ai/analyze', upload.single('pdf'), async (req, res) => {
     slideSummariesCache = summaries;
 
     // Cleanup
-    fs.unlinkSync(pdfFile.path);
+    safeUnlink(pdfFile.path);
 
     res.json({
       success: true,
@@ -601,7 +838,7 @@ app.post('/api/ai/analyze', upload.single('pdf'), async (req, res) => {
       summaries: summaries
     });
   } catch (error) {
-    if (req.file) fs.unlinkSync(req.file.path);
+    if (req.file) safeUnlink(req.file.path);
     console.error('AI Analyze error:', error);
     res.status(500).json({ error: error.message });
   }
@@ -617,6 +854,95 @@ app.get('/api/ai/summaries', (req, res) => {
 
 // 音声文字起こしキャッシュ
 let transcriptCache = null;
+
+function clampNumber(value, min, max) {
+  const v = Number(value);
+  if (!Number.isFinite(v)) return min;
+  return Math.min(max, Math.max(min, v));
+}
+
+function normalizeMarkers(rawMarkers, slideCount, totalSeconds) {
+  const count = Math.max(1, Number(slideCount) || 1);
+  const maxTime = Number.isFinite(totalSeconds) && totalSeconds > 0 ? Math.max(0, totalSeconds - 0.001) : Number.POSITIVE_INFINITY;
+
+  let markers = (Array.isArray(rawMarkers) ? rawMarkers : [])
+    .filter((m) => m && Number.isFinite(Number(m.t)) && Number.isFinite(Number(m.slide)))
+    .map((m) => ({
+      t: clampNumber(m.t, 0, maxTime),
+      slide: Math.max(1, Math.min(count, Math.round(Number(m.slide)))),
+    }))
+    .sort((a, b) => a.t - b.t);
+
+  // Ensure first marker is t=0 (slide 1)
+  if (markers.length === 0 || markers[0].t > 0.1) {
+    markers.unshift({ t: 0, slide: 1 });
+  } else {
+    markers[0].t = 0;
+    markers[0].slide = markers[0].slide || 1;
+  }
+
+  let minGap = 0.001;
+  if (Number.isFinite(maxTime) && markers.length > 1) {
+    minGap = Math.min(minGap, maxTime / (markers.length * 2));
+  }
+
+  // Enforce strictly increasing times so video generation won't fail (duration <= 0).
+  for (let i = 1; i < markers.length; i += 1) {
+    if (markers[i].t <= markers[i - 1].t) {
+      markers[i].t = markers[i - 1].t + minGap;
+    }
+    if (markers[i].t > maxTime) markers[i].t = maxTime;
+  }
+
+  if (Number.isFinite(maxTime) && markers.length > 1 && markers[markers.length - 1].t >= maxTime) {
+    // If we ran out of room, push markers back from the end.
+    markers[markers.length - 1].t = maxTime;
+    for (let i = markers.length - 2; i >= 0; i -= 1) {
+      markers[i].t = Math.min(markers[i].t, markers[i + 1].t - minGap);
+    }
+    // If still invalid, fallback to evenly spaced markers.
+    if (markers[0].t < 0) {
+      const span = Math.max(0, maxTime);
+      markers = markers.map((m, idx) => ({ ...m, t: (span * idx) / Math.max(1, markers.length - 1) }));
+      markers[0].t = 0;
+    }
+  }
+
+  return markers;
+}
+
+function groupTranscriptSegments(segments, windowSeconds) {
+  const win = Math.max(1, Number(windowSeconds) || 1);
+  const list = Array.isArray(segments) ? segments : [];
+  if (list.length === 0) return [];
+
+  const out = [];
+  let current = null;
+
+  for (const seg of list) {
+    const start = Number(seg?.start);
+    const end = Number(seg?.end);
+    const text = String(seg?.text || '').trim();
+    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+
+    if (!current) {
+      current = { start, end, texts: [] };
+    } else if (start - current.start >= win) {
+      out.push({ start: current.start, end: current.end, text: current.texts.join(' ') });
+      current = { start, end, texts: [] };
+    } else {
+      current.end = Math.max(current.end, end);
+    }
+
+    if (text) current.texts.push(text);
+  }
+
+  if (current) {
+    out.push({ start: current.start, end: current.end, text: current.texts.join(' ') });
+  }
+
+  return out;
+}
 
 // 音声ファイルを圧縮（ffmpegを使用）
 function compressAudio(inputPath, outputPath) {
@@ -641,7 +967,11 @@ app.post('/api/ai/transcribe', upload.single('audio'), async (req, res) => {
     }
     tempFiles.push(audioFile.path);
 
+    // Avoid stale cache if a new transcription fails mid-way.
+    transcriptCache = null;
+
     if (!OPENAI_API_KEY) {
+      cleanupFiles(tempFiles);
       return res.status(400).json({ error: 'OPENAI_API_KEY is not set' });
     }
 
@@ -666,10 +996,12 @@ app.post('/api/ai/transcribe', upload.single('audio'), async (req, res) => {
 
         // 圧縮後も25MBを超える場合はエラー
         if (compressedStats.size > 25 * 1024 * 1024) {
+          cleanupFiles(tempFiles);
           return res.status(400).json({ error: '圧縮後も音声ファイルが大きすぎます。より短い音声をお試しください。' });
         }
       } catch (compressError) {
         console.error('Audio compression failed:', compressError);
+        cleanupFiles(tempFiles);
         return res.status(500).json({ error: '音声圧縮に失敗しました: ' + compressError.message });
       }
     }
@@ -689,13 +1021,35 @@ app.post('/api/ai/transcribe', upload.single('audio'), async (req, res) => {
     tempFiles = tempFiles.filter(f => f !== audioPath);
 
     try {
-      const transcription = await openai.audio.transcriptions.create({
-        file: fs.createReadStream(tempPath),
-        model: 'whisper-1',
-        response_format: 'verbose_json',
-        timestamp_granularities: ['segment'],
-        language: 'ja'
-      });
+      let transcription;
+      try {
+        transcription = await withRetry(
+          async () => await withTimeout(
+            openai.audio.transcriptions.create({
+              file: fs.createReadStream(tempPath),
+              model: 'whisper-1',
+              response_format: 'verbose_json',
+              timestamp_granularities: ['segment'],
+              language: 'ja'
+            }),
+            WHISPER_TIMEOUT_MS,
+            'OpenAI transcribe'
+          ),
+          { maxRetries: AI_RETRY_MAX, shouldRetry: (err) => isOpenAITransientError(err) }
+        );
+      } catch (err) {
+        const status = Number(err?.status ?? err?.statusCode);
+        if (status === 401 || status === 403) {
+          throw new Error(`OpenAI APIキーが無効です (${status})。OPENAI_API_KEY を確認してください。`);
+        }
+        if (status === 429) {
+          throw new Error(`OpenAI API のレート制限/クォータに達しました (${status})。少し待ってから再試行してください。`);
+        }
+        if (Number.isFinite(status) && status >= 500) {
+          throw new Error(`OpenAI API が一時的に失敗しました (${status})。少し待ってから再試行してください。`);
+        }
+        throw err;
+      }
 
       const data = transcription;
 
@@ -714,9 +1068,7 @@ app.post('/api/ai/transcribe', upload.single('audio'), async (req, res) => {
       };
 
       // 一時ファイル削除
-      for (const f of tempFiles) {
-        try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (e) {}
-      }
+      cleanupFiles(tempFiles);
 
       res.json({
         success: true,
@@ -726,16 +1078,12 @@ app.post('/api/ai/transcribe', upload.single('audio'), async (req, res) => {
       });
     } catch (innerError) {
       // 内部エラー時に一時ファイルを削除
-      for (const f of tempFiles) {
-        try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (e) {}
-      }
+      cleanupFiles(tempFiles);
       throw innerError;
     }
   } catch (error) {
     // エラー時のクリーンアップ
-    for (const f of tempFiles) {
-      try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (e) {}
-    }
+    cleanupFiles(tempFiles);
     console.error('Transcribe error:', error);
     res.status(500).json({ error: error.message });
   }
@@ -770,7 +1118,8 @@ app.post('/api/ai/auto-markers', async (req, res) => {
     ).join('\n');
 
     // 音声セグメントを整形
-    const audioSegments = transcriptCache.segments.map(seg =>
+    const groupedSegments = groupTranscriptSegments(transcriptCache.segments, AUTO_MARKER_TRANSCRIPT_WINDOW_SEC);
+    const audioSegments = groupedSegments.map(seg =>
       `[${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s] ${seg.text}`
     ).join('\n');
 
@@ -781,7 +1130,7 @@ app.post('/api/ai/auto-markers', async (req, res) => {
 【スライド内容】
 ${slideSummaries}
 
-【音声文字起こし（タイムスタンプ付き）】
+【音声文字起こし（タイムスタンプ付き / ${AUTO_MARKER_TRANSCRIPT_WINDOW_SEC}秒ごとにまとめています）】
 ${audioSegments}
 
 以下の形式で、各スライドの開始タイミングをJSON形式で出力してください：
@@ -795,8 +1144,10 @@ ${audioSegments}
 5. JSON形式のみを出力（説明文は不要）`;
 
     const content = await callOpenAI(prompt);
-    console.log('GPT-5.2 response length:', content?.length || 0);
-    console.log('GPT-5.2 response preview:', content?.substring(0, 500));
+    if (DEBUG_AI) {
+      console.log(`${OPENAI_MODEL} response length:`, content?.length || 0);
+      console.log(`${OPENAI_MODEL} response preview:`, content?.substring(0, 500));
+    }
 
     // JSON部分を抽出
     let markersData;
@@ -825,19 +1176,8 @@ ${audioSegments}
       return res.status(500).json({ error: '無効なマーカーデータです' });
     }
 
-    // マーカーを検証・整形
-    const markers = markersData.markers
-      .filter(m => typeof m.t === 'number' && typeof m.slide === 'number')
-      .map(m => ({
-        t: Math.max(0, m.t),
-        slide: Math.max(1, Math.round(m.slide))
-      }))
-      .sort((a, b) => a.t - b.t);
-
-    // 最初のマーカーがt=0でない場合は追加
-    if (markers.length === 0 || markers[0].t > 0.1) {
-      markers.unshift({ t: 0, slide: 1 });
-    }
+    const totalSeconds = Number(transcriptCache.duration);
+    const markers = normalizeMarkers(markersData.markers, slideSummariesCache.length, totalSeconds);
 
     res.json({
       success: true,
