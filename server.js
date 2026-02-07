@@ -109,6 +109,7 @@ const OPENAI_REASONING_EFFORT = process.env.OPENAI_REASONING_EFFORT || 'medium';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
 const GEMINI_CONCURRENCY = Math.max(1, getEnvInt('GEMINI_CONCURRENCY', 3));
 const AUTO_MARKER_TRANSCRIPT_WINDOW_SEC = Math.max(5, getEnvInt('AUTO_MARKER_TRANSCRIPT_WINDOW_SEC', 20));
+const AUTO_MARKER_TRANSCRIPT_MAX_CHARS = Math.max(2000, getEnvInt('AUTO_MARKER_TRANSCRIPT_MAX_CHARS', 20000));
 
 function looksLikePlaceholderOpenAIKey(key) {
   const k = String(key || '').trim();
@@ -161,6 +162,7 @@ app.get('/api/health', (req, res) => {
       whisper_timeout_ms: WHISPER_TIMEOUT_MS,
       ai_retry_max: AI_RETRY_MAX,
       auto_marker_transcript_window_sec: AUTO_MARKER_TRANSCRIPT_WINDOW_SEC,
+      auto_marker_transcript_max_chars: AUTO_MARKER_TRANSCRIPT_MAX_CHARS,
     }
   });
 });
@@ -1159,10 +1161,23 @@ app.post('/api/ai/auto-markers', async (req, res) => {
     ).join('\n');
 
     // 音声セグメントを整形
-    const groupedSegments = groupTranscriptSegments(transcriptCache.segments, AUTO_MARKER_TRANSCRIPT_WINDOW_SEC);
-    const audioSegments = groupedSegments.map(seg =>
+    let windowSec = AUTO_MARKER_TRANSCRIPT_WINDOW_SEC;
+    let groupedSegments = groupTranscriptSegments(transcriptCache.segments, windowSec);
+    let audioSegments = groupedSegments.map(seg =>
       `[${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s] ${seg.text}`
     ).join('\n');
+
+    // Keep prompt size manageable for long audios.
+    while (audioSegments.length > AUTO_MARKER_TRANSCRIPT_MAX_CHARS && windowSec < 300) {
+      windowSec *= 2;
+      groupedSegments = groupTranscriptSegments(transcriptCache.segments, windowSec);
+      audioSegments = groupedSegments.map(seg =>
+        `[${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s] ${seg.text}`
+      ).join('\n');
+    }
+    if (audioSegments.length > AUTO_MARKER_TRANSCRIPT_MAX_CHARS) {
+      audioSegments = truncate(audioSegments, AUTO_MARKER_TRANSCRIPT_MAX_CHARS);
+    }
 
     const prompt = `あなたはプレゼンテーションの音声とスライドを同期させるエキスパートです。
 
@@ -1171,7 +1186,7 @@ app.post('/api/ai/auto-markers', async (req, res) => {
 【スライド内容】
 ${slideSummaries}
 
-【音声文字起こし（タイムスタンプ付き / ${AUTO_MARKER_TRANSCRIPT_WINDOW_SEC}秒ごとにまとめています）】
+【音声文字起こし（タイムスタンプ付き / ${windowSec}秒ごとにまとめています）】
 ${audioSegments}
 
 以下の形式で、各スライドの開始タイミングをJSON形式で出力してください：
