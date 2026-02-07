@@ -76,8 +76,14 @@ function progress(step, message) {
   process.stdout.write(`[${step}] ${message}\n`);
 }
 
+function formatCommand(cmd, args) {
+  const parts = [cmd, ...(args || [])];
+  return parts.filter(Boolean).join(' ');
+}
+
 function commandExists(cmd) {
-  const result = spawnSync('which', [cmd], { stdio: 'ignore' });
+  const locator = process.platform === 'win32' ? 'where' : 'which';
+  const result = spawnSync(locator, [cmd], { stdio: 'ignore' });
   return result.status === 0;
 }
 
@@ -103,22 +109,29 @@ function getWorkdir(specified) {
 function runOrThrow(cmd, args) {
   const result = spawnSync(cmd, args, { stdio: 'inherit' });
   if (result.error) {
-    throw new Error(`Command failed to execute: ${cmd} ${args.join(' ')}\n${result.error.message}`);
+    if (result.error.code === 'ENOENT') {
+      throw new Error(`Command not found: ${cmd}. Please ensure it is installed and in PATH.`);
+    }
+    throw new Error(`Command failed to execute: ${formatCommand(cmd, args)}\n${result.error.message}`);
   }
   if (result.status !== 0) {
-    throw new Error(`Command failed: ${cmd} ${args.join(' ')}`);
+    throw new Error(`Command failed: ${formatCommand(cmd, args)}`);
   }
 }
 
 function runCapture(cmd, args) {
   const result = spawnSync(cmd, args, { encoding: 'utf8' });
   if (result.error) {
-    throw new Error(`Command failed to execute: ${cmd} ${args.join(' ')}\n${result.error.message}`);
+    if (result.error.code === 'ENOENT') {
+      throw new Error(`Command not found: ${cmd}. Please ensure it is installed and in PATH.`);
+    }
+    throw new Error(`Command failed to execute: ${formatCommand(cmd, args)}\n${result.error.message}`);
   }
   if (result.status !== 0) {
-    throw new Error(`Command failed: ${cmd} ${args.join(' ')}`);
+    const stderr = result.stderr ?? '';
+    throw new Error(`Command failed: ${formatCommand(cmd, args)}\n${stderr}`.trimEnd());
   }
-  return result.stdout.trim();
+  return (result.stdout ?? '').trim();
 }
 
 function getAudioDurationSeconds(audioPath) {
@@ -309,7 +322,10 @@ function computeMarkerPlan(markersPath, slideMap, totalSeconds) {
 }
 
 function escapePath(filePath) {
-  return filePath.replace(/'/g, "'\\''");
+  // Windowsのバックスラッシュをスラッシュに変換（ffmpegはスラッシュを受け付ける）
+  let normalized = filePath.replace(/\\/g, '/');
+  // シングルクォートをエスケープ
+  return normalized.replace(/'/g, "'\\''");
 }
 
 function writeConcatFile(workdir, slides, durations) {

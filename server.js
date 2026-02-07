@@ -1,8 +1,34 @@
 const path = require('path');
 const fs = require('fs');
 
+const ROOT_DIR = __dirname;
+const EDITOR_DIR = path.join(ROOT_DIR, 'editor');
+const OUTPUT_DIR = path.join(ROOT_DIR, 'output');
+const UPLOADS_DIR = path.join(ROOT_DIR, 'uploads');
+const WORK_DIR = path.join(ROOT_DIR, 'work');
+
+function ensureDirExists(dirPath) {
+  try {
+    fs.mkdirSync(dirPath, { recursive: true });
+  } catch (err) {
+    console.error('========================================');
+    console.error('エラー: 必要なフォルダを作成できません');
+    console.error('========================================');
+    console.error(`作成できないフォルダ: ${dirPath}`);
+    console.error(`理由: ${err?.message || err}`);
+    console.error('');
+    console.error('このフォルダに書き込み権限がある場所に配置してから、再度お試しください。');
+    process.exit(1);
+  }
+}
+
+// Ensure expected directories exist even when started from a different CWD.
+ensureDirExists(OUTPUT_DIR);
+ensureDirExists(UPLOADS_DIR);
+ensureDirExists(WORK_DIR);
+
 // .envファイルのBOM除去（Windowsメモ帳対策）
-const envPath = path.join(__dirname, '.env');
+const envPath = path.join(ROOT_DIR, '.env');
 if (fs.existsSync(envPath)) {
   let content = fs.readFileSync(envPath, 'utf8');
   if (content.charCodeAt(0) === 0xFEFF) {
@@ -22,8 +48,8 @@ const app = express();
 const PORT = 3001;
 
 // API Keys (set via .env file or environment variable)
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || '').trim() || null;
+const GEMINI_API_KEY = String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim() || null;
 
 function getEnvInt(name, fallback) {
   const raw = process.env[name];
@@ -36,6 +62,24 @@ function truncate(text, maxChars) {
   const s = String(text ?? '');
   if (s.length <= maxChars) return s;
   return `${s.slice(0, maxChars)}...`;
+}
+
+function normalizeOpenAIBaseUrl(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return 'https://api.openai.com/v1';
+
+  const base = value.replace(/\/+$/, '');
+  // Common footgun: people set https://api.openai.com (missing /v1)
+  if (!base.includes('/v1')) return `${base}/v1`;
+  return base;
+}
+
+function normalizeReasoningEffort(raw) {
+  const effort = String(raw || '').trim().toLowerCase();
+  if (!effort) return 'medium';
+  if (effort === 'none' || effort === 'low' || effort === 'medium' || effort === 'high') return effort;
+  console.log(`[Config] Invalid OPENAI_REASONING_EFFORT="${effort}", falling back to "medium".`);
+  return 'medium';
 }
 
 function sleep(ms) {
@@ -104,8 +148,11 @@ const DEBUG_AI = process.env.DEBUG_AI === '1';
 const AI_TIMEOUT_MS = getEnvInt('AI_TIMEOUT_MS', 120000);
 const WHISPER_TIMEOUT_MS = getEnvInt('WHISPER_TIMEOUT_MS', 10 * 60 * 1000);
 const AI_RETRY_MAX = getEnvInt('AI_RETRY_MAX', 2);
+const OPENAI_BASE_URL = normalizeOpenAIBaseUrl(process.env.OPENAI_BASE_URL);
+const OPENAI_ORG_ID = String(process.env.OPENAI_ORG_ID || process.env.OPENAI_ORGANIZATION || '').trim();
+const OPENAI_PROJECT_ID = String(process.env.OPENAI_PROJECT_ID || '').trim();
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.2';
-const OPENAI_REASONING_EFFORT = process.env.OPENAI_REASONING_EFFORT || 'medium';
+const OPENAI_REASONING_EFFORT = normalizeReasoningEffort(process.env.OPENAI_REASONING_EFFORT || 'medium');
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
 const GEMINI_CONCURRENCY = Math.max(1, getEnvInt('GEMINI_CONCURRENCY', 3));
 const AUTO_MARKER_TRANSCRIPT_WINDOW_SEC = Math.max(5, getEnvInt('AUTO_MARKER_TRANSCRIPT_WINDOW_SEC', 20));
@@ -130,29 +177,38 @@ function looksLikePlaceholderGeminiKey(key) {
 
 // Gemini client
 let geminiClient = null;
-if (GEMINI_API_KEY) {
+if (GEMINI_API_KEY && !looksLikePlaceholderGeminiKey(GEMINI_API_KEY)) {
   geminiClient = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 }
 
 // Upload configuration
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ dest: UPLOADS_DIR });
 
 // Serve static files
-app.use(express.static('editor'));
-app.use('/output', express.static('output')); // 生成された動画のダウンロード用
+app.use(express.static(EDITOR_DIR));
+app.use('/output', express.static(OUTPUT_DIR)); // 生成された動画のダウンロード用
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {
+  const openaiUsable = Boolean(OPENAI_API_KEY && !looksLikePlaceholderOpenAIKey(OPENAI_API_KEY));
+  const geminiUsable = Boolean(GEMINI_API_KEY && !looksLikePlaceholderGeminiKey(GEMINI_API_KEY));
+
   res.json({
     ok: true,
     node: process.version,
     openai: {
-      configured: Boolean(OPENAI_API_KEY),
+      configured: openaiUsable,
+      present: Boolean(OPENAI_API_KEY),
       placeholder: looksLikePlaceholderOpenAIKey(OPENAI_API_KEY),
+      base_url: OPENAI_BASE_URL,
+      org_configured: Boolean(OPENAI_ORG_ID),
+      project_configured: Boolean(OPENAI_PROJECT_ID),
       model: OPENAI_MODEL,
+      reasoning_effort: OPENAI_REASONING_EFFORT,
     },
     gemini: {
-      configured: Boolean(GEMINI_API_KEY),
+      configured: geminiUsable,
+      present: Boolean(GEMINI_API_KEY),
       placeholder: looksLikePlaceholderGeminiKey(GEMINI_API_KEY),
       model: GEMINI_MODEL,
       concurrency: GEMINI_CONCURRENCY,
@@ -385,7 +441,7 @@ app.post('/api/generate', upload.fields([
   { name: 'pdf', maxCount: 1 },
   { name: 'audio', maxCount: 1 }
 ]), async (req, res) => {
-  const workdir = path.join('work', `gen-${Date.now()}`);
+  const workdir = path.join(WORK_DIR, `gen-${Date.now()}`);
   const startTime = Date.now();
   console.log('[Video Generate] Starting video generation...');
 
@@ -448,12 +504,8 @@ app.post('/api/generate', upload.fields([
     console.log(`[Video Generate] Total processing time: ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
 
     // 動画をoutputフォルダに移動（ダウンロードリンク用）
-    const outputDir = path.join(__dirname, 'output');
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
     const finalFilename = `slidecast-${Date.now()}.mp4`;
-    const finalPath = path.join(outputDir, finalFilename);
+    const finalPath = path.join(OUTPUT_DIR, finalFilename);
     fs.copyFileSync(outputPath, finalPath);
     console.log(`[Video Generate] Video saved to: ${finalPath}`);
 
@@ -494,7 +546,7 @@ function isGeminiRetryableError(err) {
 
 function isGeminiAuthError(err) {
   const msg = String(err?.message || err || '');
-  return /401|403|unauthenticated|permission_denied|api key|invalid/i.test(msg.toLowerCase());
+  return /401|403|unauthenticated|permission_denied|api key|apikey|api-key/i.test(msg.toLowerCase());
 }
 
 // Gemini 3.0 Flash でスライドを要約
@@ -504,7 +556,7 @@ async function summarizeSlides(pdfPath) {
   }
 
   // PDFをPNG変換（一時ディレクトリ）
-  const workdir = path.join('work', `summary-${Date.now()}`);
+  const workdir = path.join(WORK_DIR, `summary-${Date.now()}`);
   fs.mkdirSync(workdir, { recursive: true });
 
   try {
@@ -591,11 +643,11 @@ async function getSlideSummaries(pdfPath) {
 
 // AI API endpoints (using OpenAI GPT-5.2 Responses API with reasoning)
 async function callOpenAI(prompt) {
-  if (!OPENAI_API_KEY) {
+  if (!OPENAI_API_KEY || looksLikePlaceholderOpenAIKey(OPENAI_API_KEY)) {
     throw new Error('OPENAI_API_KEY is not set. Please add it to .env file.');
   }
 
-  const url = 'https://api.openai.com/v1/responses';
+  const url = `${OPENAI_BASE_URL}/responses`;
 
   function parseJson(text) {
     try {
@@ -635,7 +687,9 @@ async function callOpenAI(prompt) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          ...(OPENAI_ORG_ID ? { 'OpenAI-Organization': OPENAI_ORG_ID } : {}),
+          ...(OPENAI_PROJECT_ID ? { 'OpenAI-Project': OPENAI_PROJECT_ID } : {}),
         },
         body: JSON.stringify(body),
         signal: controller.signal,
@@ -748,7 +802,7 @@ function isOpenAITransientError(err) {
 // Generate summary for video description
 app.post('/api/ai/summary', async (req, res) => {
   try {
-    if (!OPENAI_API_KEY) {
+    if (!OPENAI_API_KEY || looksLikePlaceholderOpenAIKey(OPENAI_API_KEY)) {
       return res.status(400).json({ error: 'OPENAI_API_KEY is not set' });
     }
     const { pdfName, audioName, slideCount, duration } = req.body;
@@ -786,7 +840,7 @@ PDF名: ${pdfName}
 // Extract key points from presentation
 app.post('/api/ai/keypoints', async (req, res) => {
   try {
-    if (!OPENAI_API_KEY) {
+    if (!OPENAI_API_KEY || looksLikePlaceholderOpenAIKey(OPENAI_API_KEY)) {
       return res.status(400).json({ error: 'OPENAI_API_KEY is not set' });
     }
     const { pdfName, slideCount, markers, duration } = req.body;
@@ -824,7 +878,7 @@ PDF名: ${pdfName}
 // Generate quiz questions
 app.post('/api/ai/quiz', async (req, res) => {
   try {
-    if (!OPENAI_API_KEY) {
+    if (!OPENAI_API_KEY || looksLikePlaceholderOpenAIKey(OPENAI_API_KEY)) {
       return res.status(400).json({ error: 'OPENAI_API_KEY is not set' });
     }
     const { pdfName, slideCount } = req.body;
@@ -1021,7 +1075,7 @@ app.post('/api/ai/transcribe', upload.single('audio'), async (req, res) => {
     // Avoid stale cache if a new transcription fails mid-way.
     transcriptCache = null;
 
-    if (!OPENAI_API_KEY) {
+    if (!OPENAI_API_KEY || looksLikePlaceholderOpenAIKey(OPENAI_API_KEY)) {
       cleanupFiles(tempFiles);
       return res.status(400).json({ error: 'OPENAI_API_KEY is not set' });
     }
@@ -1059,7 +1113,12 @@ app.post('/api/ai/transcribe', upload.single('audio'), async (req, res) => {
 
     // OpenAI SDKを使用してWhisper APIにファイルを送信
     const OpenAI = require('openai');
-    const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+    const openai = new OpenAI({
+      apiKey: OPENAI_API_KEY,
+      baseURL: OPENAI_BASE_URL,
+      organization: OPENAI_ORG_ID || undefined,
+      project: OPENAI_PROJECT_ID || undefined,
+    });
 
     // ファイル名を取得して正しい拡張子の一時ファイルを作成
     const ext = path.extname(originalName) || '.mp3';
@@ -1151,7 +1210,7 @@ app.get('/api/ai/transcript', (req, res) => {
 // 自動マーカー生成（GPT-5.2でスライドと音声をマッチング）
 app.post('/api/ai/auto-markers', async (req, res) => {
   try {
-    if (!OPENAI_API_KEY) {
+    if (!OPENAI_API_KEY || looksLikePlaceholderOpenAIKey(OPENAI_API_KEY)) {
       return res.status(400).json({ error: 'OPENAI_API_KEY is not set' });
     }
 
