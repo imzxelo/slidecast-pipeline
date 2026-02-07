@@ -223,6 +223,40 @@ Write-Host ""
 if (Get-Command node -ErrorAction SilentlyContinue) {
     $nodeVersion = node --version
     Write-Host "[OK] Node.jsは既にインストールされています。（バージョン: $nodeVersion）" -ForegroundColor Green
+
+    # Node.js 18+ が必要（古い場合はLTSをインストール）
+    $nodeMajor = 0
+    if ($nodeVersion -match '^v(\d+)') {
+        $nodeMajor = [int]$Matches[1]
+    }
+
+    if ($nodeMajor -lt 18) {
+        Write-Host ""
+        Write-Host "========================================" -ForegroundColor Yellow
+        Write-Host " 警告: Node.js のバージョンが古すぎます" -ForegroundColor Yellow
+        Write-Host "========================================" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "このアプリは Node.js 18 以上が必要です。"
+        Write-Host "Node.js (LTS) をインストールします..." -ForegroundColor Cyan
+        Write-Host ""
+
+        try {
+            choco install nodejs-lts -y
+
+            # PATHを更新
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+
+            $nodeVersion = node --version
+            Write-Host ""
+            Write-Host "[OK] Node.js を更新しました。（バージョン: $nodeVersion）" -ForegroundColor Green
+        } catch {
+            Write-Host ""
+            Write-Host "[エラー] Node.jsのインストールに失敗しました。" -ForegroundColor Red
+            Write-Host "エラー詳細: $_" -ForegroundColor Red
+            Read-Host "Enterキーを押すと終了します"
+            exit 1
+        }
+    }
 } else {
     Write-Host "Node.jsをインストールしています..." -ForegroundColor Cyan
     Write-Host "（数分かかる場合があります。お待ちください...）"
@@ -310,6 +344,53 @@ if (Get-Command pdftoppm -ErrorAction SilentlyContinue) {
         Write-Host "エラー詳細: $_" -ForegroundColor Red
         Read-Host "Enterキーを押すと終了します"
         exit 1
+    }
+}
+
+# poppler はインストールされても pdftoppm.exe が PATH に追加されない場合があるため補正
+if (-not (Get-Command pdftoppm -ErrorAction SilentlyContinue)) {
+    try {
+        $chocoRoot = $env:ChocolateyInstall
+        if (-not $chocoRoot) {
+            $chocoRoot = "C:\\ProgramData\\chocolatey"
+        }
+
+        $popplerTools = Join-Path $chocoRoot "lib\\poppler\\tools"
+        $pdftoppmExe = $null
+
+        if (Test-Path $popplerTools) {
+            $pdftoppmExe = Get-ChildItem $popplerTools -Recurse -Filter "pdftoppm.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+        }
+
+        if ($pdftoppmExe) {
+            $popplerBin = Split-Path -Parent $pdftoppmExe.FullName
+
+            function Normalize-PathEntry([string]$p) {
+                if (-not $p) { return "" }
+                return $p.Trim().TrimEnd('\\').ToLowerInvariant()
+            }
+
+            $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+            if (-not $machinePath) { $machinePath = "" }
+
+            $entries = $machinePath.Split(';') | ForEach-Object { Normalize-PathEntry $_ }
+            $popplerNorm = Normalize-PathEntry $popplerBin
+
+            if ($popplerNorm -and ($entries -notcontains $popplerNorm)) {
+                $newMachinePath = ($machinePath.TrimEnd(';') + ";" + $popplerBin).TrimStart(';')
+                [Environment]::SetEnvironmentVariable("Path", $newMachinePath, "Machine")
+            }
+
+            # 現在のセッションに反映
+            $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+
+            Write-Host "[OK] pdftoppm のパスをPATHに追加しました: $popplerBin" -ForegroundColor Green
+            Write-Host "※ すでに開いているコマンドプロンプト/エクスプローラーには、PC再起動後に反映されることがあります。" -ForegroundColor Yellow
+        } else {
+            Write-Host "[警告] pdftoppm.exe が見つかりませんでした。popplerのインストールを確認してください。" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "[警告] pdftoppm の PATH 設定に失敗しました: $_" -ForegroundColor Yellow
     }
 }
 Write-Host ""
