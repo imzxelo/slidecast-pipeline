@@ -1726,7 +1726,7 @@
         aiResult.innerHTML = `<h4>${data.title}</h4><p>${data.content}</p>`;
         aiCopyBtn.style.display = 'block';
       } catch (error) {
-        if (error.message.includes('API key') || error.message.includes('OPENAI')) {
+        if (error.message.includes('OPENAI_API_KEY')) {
           aiResult.innerHTML = '<p>APIキーが設定されていません。<br>.envファイルにOPENAI_API_KEYを設定してください。</p>';
         } else {
           aiResult.innerHTML = `<p>エラー: ${error.message}</p>`;
@@ -1777,7 +1777,7 @@
         aiResult.innerHTML = `<h4>スライド要約</h4><p>${summaryText.replace(/\n/g, '<br>')}</p>`;
         aiCopyBtn.style.display = 'block';
       } catch (error) {
-        if (error.message.includes('GEMINI')) {
+        if (error.message.includes('GEMINI_API_KEY')) {
           aiResult.innerHTML = '<p>GEMINI_API_KEYが設定されていません。<br>.envファイルにGEMINI_API_KEYを設定してください。</p>';
         } else {
           aiResult.innerHTML = `<p>エラー: ${error.message}</p>`;
