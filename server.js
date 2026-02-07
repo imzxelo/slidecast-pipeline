@@ -65,12 +65,22 @@ function truncate(text, maxChars) {
 }
 
 function normalizeOpenAIBaseUrl(raw) {
+  const defaultUrl = 'https://api.openai.com/v1';
   const value = String(raw || '').trim();
-  if (!value) return 'https://api.openai.com/v1';
+  if (!value) return defaultUrl;
 
-  const base = value.replace(/\/+$/, '');
+  let base = value.replace(/\/+$/, '');
   // Common footgun: people set https://api.openai.com (missing /v1)
-  if (!base.includes('/v1')) return `${base}/v1`;
+  if (!base.includes('/v1')) base = `${base}/v1`;
+
+  try {
+    // Ensure it's an absolute URL (includes scheme).
+    new URL(base);
+  } catch {
+    console.log(`[Config] Invalid OPENAI_BASE_URL="${value}", falling back to ${defaultUrl}.`);
+    return defaultUrl;
+  }
+
   return base;
 }
 
@@ -680,7 +690,8 @@ async function callOpenAI(prompt) {
 
   async function requestResponses(body) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+    const timeoutMs = Number.isFinite(AI_TIMEOUT_MS) && AI_TIMEOUT_MS > 0 ? AI_TIMEOUT_MS : 0;
+    const timeoutId = timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
     try {
       const response = await fetch(url, {
@@ -709,7 +720,7 @@ async function callOpenAI(prompt) {
       return await response.json();
     } catch (err) {
       if (err?.name === 'AbortError') {
-        const e = new Error(`OpenAI API request timed out after ${AI_TIMEOUT_MS}ms`);
+        const e = new Error(`OpenAI API request timed out after ${timeoutMs}ms`);
         e.retryable = true;
         throw e;
       }
@@ -719,7 +730,7 @@ async function callOpenAI(prompt) {
       }
       throw err;
     } finally {
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
     }
   }
 
