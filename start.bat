@@ -41,6 +41,80 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+REM ffmpeg/ffprobe が使えるか確認
+where ffmpeg > nul 2>&1
+if %errorlevel% neq 0 (
+    echo ========================================
+    echo  エラー: ffmpeg が見つかりません
+    echo ========================================
+    echo.
+    echo FFmpeg がインストールされていないか、PATHが通っていません。
+    echo setup.ps1 を実行してセットアップを完了してください。
+    echo.
+    pause
+    exit /b 1
+)
+
+where ffprobe > nul 2>&1
+if %errorlevel% neq 0 (
+    echo ========================================
+    echo  エラー: ffprobe が見つかりません
+    echo ========================================
+    echo.
+    echo FFmpeg がインストールされていないか、PATHが通っていません。
+    echo setup.ps1 を実行してセットアップを完了してください。
+    echo.
+    pause
+    exit /b 1
+)
+
+REM pdftoppm が使えるか確認（poppler）
+where pdftoppm > nul 2>&1
+if %errorlevel% neq 0 (
+    echo ----------------------------------------
+    echo  注意: pdftoppm が PATH から見つかりません
+    echo ----------------------------------------
+    echo poppler がインストールされていても、PATHに追加されない場合があります。
+    echo pdftoppm.exe を自動で探します...
+    echo.
+
+    set "PDFTOPPM_BIN="
+    if exist "C:\\ProgramData\\chocolatey\\lib\\poppler\\tools" (
+        for /r "C:\\ProgramData\\chocolatey\\lib\\poppler\\tools" %%F in (pdftoppm.exe) do (
+            if not defined PDFTOPPM_BIN set "PDFTOPPM_BIN=%%~dpF"
+        )
+    )
+
+    if defined PDFTOPPM_BIN (
+        call echo [OK] pdftoppm.exe を見つけました: %%PDFTOPPM_BIN%%
+        call set "PATH=%%PATH%%;%%PDFTOPPM_BIN%%"
+        echo.
+    ) else (
+        echo ========================================
+        echo  エラー: pdftoppm が見つかりません
+        echo ========================================
+        echo.
+        echo Poppler (pdftoppm) がインストールされていない可能性があります。
+        echo setup.ps1 を実行してセットアップを完了してください。
+        echo.
+        pause
+        exit /b 1
+    )
+)
+
+REM 最終確認（pdftoppm）
+where pdftoppm > nul 2>&1
+if %errorlevel% neq 0 (
+    echo ========================================
+    echo  エラー: pdftoppm が見つかりません
+    echo ========================================
+    echo.
+    echo setup.ps1 を実行してセットアップを完了してください。
+    echo.
+    pause
+    exit /b 1
+)
+
 echo このウィンドウは、アプリを使用中は開いたままにしてください。
 echo 閉じるとアプリが停止します。
 echo.

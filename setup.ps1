@@ -312,6 +312,53 @@ if (Get-Command pdftoppm -ErrorAction SilentlyContinue) {
         exit 1
     }
 }
+
+# poppler はインストールされても pdftoppm.exe が PATH に追加されない場合があるため補正
+if (-not (Get-Command pdftoppm -ErrorAction SilentlyContinue)) {
+    try {
+        $chocoRoot = $env:ChocolateyInstall
+        if (-not $chocoRoot) {
+            $chocoRoot = "C:\\ProgramData\\chocolatey"
+        }
+
+        $popplerTools = Join-Path $chocoRoot "lib\\poppler\\tools"
+        $pdftoppmExe = $null
+
+        if (Test-Path $popplerTools) {
+            $pdftoppmExe = Get-ChildItem $popplerTools -Recurse -Filter "pdftoppm.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+        }
+
+        if ($pdftoppmExe) {
+            $popplerBin = Split-Path -Parent $pdftoppmExe.FullName
+
+            function Normalize-PathEntry([string]$p) {
+                if (-not $p) { return "" }
+                return $p.Trim().TrimEnd('\\').ToLowerInvariant()
+            }
+
+            $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+            if (-not $machinePath) { $machinePath = "" }
+
+            $entries = $machinePath.Split(';') | ForEach-Object { Normalize-PathEntry $_ }
+            $popplerNorm = Normalize-PathEntry $popplerBin
+
+            if ($popplerNorm -and ($entries -notcontains $popplerNorm)) {
+                $newMachinePath = ($machinePath.TrimEnd(';') + ";" + $popplerBin).TrimStart(';')
+                [Environment]::SetEnvironmentVariable("Path", $newMachinePath, "Machine")
+            }
+
+            # 現在のセッションに反映
+            $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+
+            Write-Host "[OK] pdftoppm のパスをPATHに追加しました: $popplerBin" -ForegroundColor Green
+            Write-Host "※ すでに開いているコマンドプロンプト/エクスプローラーには、PC再起動後に反映されることがあります。" -ForegroundColor Yellow
+        } else {
+            Write-Host "[警告] pdftoppm.exe が見つかりませんでした。popplerのインストールを確認してください。" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "[警告] pdftoppm の PATH 設定に失敗しました: $_" -ForegroundColor Yellow
+    }
+}
 Write-Host ""
 
 # ステップ5: npmパッケージのインストール

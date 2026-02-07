@@ -11,7 +11,7 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-require('dotenv').config();
+require('dotenv').config({ path: envPath });
 
 const express = require('express');
 const multer = require('multer');
@@ -40,18 +40,37 @@ app.use('/output', express.static('output')); // 生成された動画のダウ�
 app.use(express.json());
 
 // Helper functions (from bin/slidecast.js)
+function formatCommand(cmd, args) {
+  const parts = [cmd, ...(args || [])];
+  return parts.filter(Boolean).join(' ');
+}
+
 function runCapture(cmd, args) {
   const result = spawnSync(cmd, args, { encoding: 'utf8' });
-  if (result.status !== 0) {
-    throw new Error(`Command failed: ${cmd} ${args.join(' ')}`);
+  if (result.error) {
+    if (result.error.code === 'ENOENT') {
+      throw new Error(`Command not found: ${cmd}. Please ensure it is installed and in PATH.`);
+    }
+    throw new Error(`Command failed to execute: ${formatCommand(cmd, args)}\n${result.error.message}`);
   }
-  return result.stdout.trim();
+  if (result.status !== 0) {
+    const stderr = result.stderr ?? '';
+    throw new Error(`Command failed: ${formatCommand(cmd, args)}\n${stderr}`.trimEnd());
+  }
+  return (result.stdout ?? '').trim();
 }
 
 function runOrThrow(cmd, args) {
   const result = spawnSync(cmd, args, { stdio: 'pipe', encoding: 'utf8' });
+  if (result.error) {
+    if (result.error.code === 'ENOENT') {
+      throw new Error(`Command not found: ${cmd}. Please ensure it is installed and in PATH.`);
+    }
+    throw new Error(`Command failed to execute: ${formatCommand(cmd, args)}\n${result.error.message}`);
+  }
   if (result.status !== 0) {
-    throw new Error(`Command failed: ${cmd} ${args.join(' ')}\n${result.stderr}`);
+    const stderr = result.stderr ?? '';
+    throw new Error(`Command failed: ${formatCommand(cmd, args)}\n${stderr}`.trimEnd());
   }
 }
 
@@ -830,6 +849,42 @@ ${audioSegments}
     res.status(500).json({ error: error.message });
   }
 });
+
+// 依存コマンドのチェック（サーバー起動前）
+function checkDependencies() {
+  const locator = process.platform === 'win32' ? 'where' : 'which';
+  const deps = ['pdftoppm', 'ffmpeg', 'ffprobe'];
+  const missing = [];
+
+  for (const cmd of deps) {
+    const result = spawnSync(locator, [cmd], { stdio: 'pipe', encoding: 'utf8' });
+    if (result.error || result.status !== 0) {
+      missing.push(cmd);
+    }
+  }
+
+  if (missing.length === 0) return;
+
+  console.error('========================================');
+  console.error('エラー: 必要なコマンドが見つかりません');
+  console.error('========================================');
+  console.error(`未インストール/未検出: ${missing.join(', ')}`);
+  console.error('');
+
+  if (process.platform === 'win32') {
+    console.error('setup.ps1 を実行してセットアップを完了してください。');
+    console.error('ヒント: poppler はインストールされても pdftoppm が PATH に追加されない場合があります。');
+    console.error('      その場合は start.bat から起動するか、PC再起動後に再度お試しください。');
+  } else {
+    console.error('必要なパッケージをインストールしてください:');
+    console.error('  macOS: brew install poppler ffmpeg');
+    console.error('  Ubuntu/Debian: sudo apt install poppler-utils ffmpeg');
+  }
+
+  process.exit(1);
+}
+
+checkDependencies();
 
 const server = app.listen(PORT, () => {
   console.log(`Slide Sync Editor running at http://localhost:${PORT}`);

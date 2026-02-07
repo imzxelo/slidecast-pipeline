@@ -102,6 +102,9 @@ function getWorkdir(specified) {
 
 function runOrThrow(cmd, args) {
   const result = spawnSync(cmd, args, { stdio: 'inherit' });
+  if (result.error) {
+    throw new Error(`Command failed to execute: ${cmd} ${args.join(' ')}\n${result.error.message}`);
+  }
   if (result.status !== 0) {
     throw new Error(`Command failed: ${cmd} ${args.join(' ')}`);
   }
@@ -109,6 +112,9 @@ function runOrThrow(cmd, args) {
 
 function runCapture(cmd, args) {
   const result = spawnSync(cmd, args, { encoding: 'utf8' });
+  if (result.error) {
+    throw new Error(`Command failed to execute: ${cmd} ${args.join(' ')}\n${result.error.message}`);
+  }
   if (result.status !== 0) {
     throw new Error(`Command failed: ${cmd} ${args.join(' ')}`);
   }
